@@ -1,5 +1,5 @@
-# Resume Optimiser : https://rohinirt.github.io/AI-Resume-Optimiser/
-
+# Resume Optimiser :
+App:  https://rohinirt.github.io/AI-Resume-Optimiser/
 Upload your resume (.docx), Uber experience file, projects file and a job description. The app scores the match, rewrites your summary, experience bullets, projects and skills from your own facts, explains each change, and exports Word or PDF.
 
 It is a single static page (`index.html`). There is no server and no build step.
