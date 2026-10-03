@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Resume Optimiser</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+:root{--ink:#1B2433;--paper:#F3F5FA;--panel:#fff;--rule:#E1E6EF;--mute:#667085;--acc:#4C6EF5;--accs:#EDF1FF;--ok:#0E8F7E;--oks:#E4F5F2;--warn:#C26A0A;--warns:#FFF3E0;--bad:#D63A2F;--bads:#FDECEA;--track:#E8ECF4;--focus:#4C6EF5;--mark:#FFF1B8;--sh:0 1px 2px rgba(16,24,40,.06),0 6px 18px rgba(16,24,40,.06);
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--ink:#E8ECF4;--paper:#0F141B;--panel:#171E28;--rule:#2A3441;--mute:#98A2B3;--acc:#8EA4FF;--accs:#222C4A;--ok:#4FD1BC;--oks:#13302C;--warn:#F0A94E;--warns:#3A2A12;--bad:#FF8A80;--bads:#3C1B18;--track:#2A3441;--focus:#8EA4FF;--mark:#5A4A12;--sh:0 1px 2px rgba(0,0,0,.4),0 6px 18px rgba(0,0,0,.3)}}
+:root[data-theme="dark"]{--ink:#E8ECF4;--paper:#0F141B;--panel:#171E28;--rule:#2A3441;--mute:#98A2B3;--acc:#8EA4FF;--accs:#222C4A;--ok:#4FD1BC;--oks:#13302C;--warn:#F0A94E;--warns:#3A2A12;--bad:#FF8A80;--bads:#3C1B18;--track:#2A3441;--focus:#8EA4FF;--mark:#5A4A12;--sh:0 1px 2px rgba(0,0,0,.4),0 6px 18px rgba(0,0,0,.3)}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);font:14.5px/1.55 Inter,"Segoe UI",system-ui,-apple-system,Arial,sans-serif}
+main{display:grid;grid-template-columns:1fr;min-height:100vh}
+@media(min-width:1000px){main{grid-template-columns:minmax(0,5fr) minmax(0,6fr)}.pane{height:100vh;overflow-y:auto}}
+.pane{padding:24px}.l{border-right:1px solid var(--rule)}.r{container-type:inline-size;background:var(--paper)}
+.brand{display:flex;gap:12px;align-items:center;margin-bottom:18px}.logo{width:38px;height:38px;border-radius:10px;background:linear-gradient(135deg,var(--acc),var(--ok));display:grid;place-items:center;color:#fff;font-weight:700}
+h1{font-size:19px;margin:0;line-height:1.2}h2{font-size:13px;margin:22px 0 10px;text-transform:uppercase;letter-spacing:.06em;color:var(--mute)}
+.mute{color:var(--mute);font-size:13px}.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.card{background:var(--panel);border:1px solid var(--rule);border-radius:14px;box-shadow:var(--sh)}
+/* inputs */
+.inputs{margin-bottom:14px}.inputs>summary{list-style:none;cursor:pointer;padding:12px 14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.inputs>summary::-webkit-details-marker{display:none}.sumt{font-weight:700}.edit{margin-left:auto;font-size:13px;font-weight:600;color:var(--acc)}.edit::before{content:'Edit inputs'}details[open]>summary .edit::before{content:'Collapse'}
+.ig{padding:0 14px 14px;display:grid;gap:10px}.in{border:1px solid var(--rule);border-radius:10px;padding:10px 12px;background:var(--paper)}
+.in b{font-size:13px;display:flex;gap:8px;align-items:center}.n{width:20px;height:20px;border-radius:50%;background:var(--acc);color:var(--panel);font-size:11px;display:grid;place-items:center}
+textarea{width:100%;height:72px;margin-top:6px;border:1px solid var(--rule);border-radius:8px;padding:8px;font:12px/1.4 ui-monospace,Consolas,monospace;background:var(--panel);color:var(--ink)}
+input[type=file]{font-size:12px;max-width:100%;margin-top:6px}
+.pill{display:inline-flex;align-items:center;gap:4px;font-size:12px;border-radius:999px;padding:2px 10px;background:var(--track);color:var(--mute);font-weight:500}
+.pill.ok{background:var(--oks);color:var(--ok)}.pill.wn{background:var(--warns);color:var(--warn)}.pill.bd{background:var(--bads);color:var(--bad)}.pill.ac{background:var(--accs);color:var(--acc)}
+button{font:inherit;font-size:14px;font-weight:600;border-radius:10px;padding:9px 16px;cursor:pointer;border:1px solid var(--rule);background:var(--panel);color:var(--ink)}
+button.p{background:var(--acc);border-color:var(--acc);color:#fff}[data-theme="dark"] button.p{color:#0F141B}button:disabled{opacity:.45;cursor:default}
+button:focus-visible,textarea:focus-visible,summary:focus-visible,input:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+#status{font-size:13px;color:var(--mute);margin-top:10px;min-height:18px}.err{color:var(--bad)}
+/* rings + analysis */
+.ring{--s:56px;--i:6px;width:var(--s);height:var(--s);flex:none;border-radius:50%;display:grid;place-items:center;position:relative;background:conic-gradient(var(--c) calc(var(--p)*1%),var(--track) 0)}
+.ring::before{content:'';position:absolute;inset:var(--i);background:var(--panel);border-radius:50%}.ring span{position:relative;font-weight:700;font-variant-numeric:tabular-nums}
+.ring.xl{--s:96px;--i:9px}.ring.xl span{font-size:26px}
+.hero{padding:16px;display:flex;gap:16px;align-items:center;margin-top:16px}
+.verdict{padding:12px 14px;border-radius:12px;margin:12px 0;font-size:13.5px}.verdict.ok{background:var(--oks)}.verdict.warn{background:var(--warns)}.verdict.bad{background:var(--bads)}
+.fac{margin:10px 0}.fac>summary{list-style:none;cursor:pointer;padding:14px;display:grid;grid-template-columns:auto 1fr auto;gap:14px;align-items:center}
+.fac>summary::-webkit-details-marker{display:none}.fac h3{margin:0;font-size:14.5px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.fac .rs{color:var(--mute);font-size:12.5px;line-height:1.45;margin:2px 0 6px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}.fac[open] .rs{display:block;overflow:visible;-webkit-line-clamp:unset}
+.chev{width:22px;height:22px;transition:transform .2s;color:var(--mute)}details[open]>summary .chev{transform:rotate(180deg)}
+.fb{padding:0 14px 14px}.grp{font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin:12px 0 6px}
+.it{border-left:3px solid;border-radius:6px;background:var(--paper);padding:7px 10px;margin:6px 0;font-size:13px}.it.match{border-color:var(--ok)}.it.partial{border-color:var(--warn)}.it.missing{border-color:var(--bad)}
+.it q{color:var(--mute);font-style:italic;quotes:none}
+/* right pane */
+.bar{position:sticky;top:0;z-index:2;background:var(--paper);padding-bottom:10px;margin:-4px 0 6px}
+.tabs{display:flex;gap:4px;background:var(--track);padding:4px;border-radius:12px;margin:10px 0}.tabs button{flex:1;border:0;background:transparent;color:var(--mute);font-weight:600;font-size:13px;padding:7px 8px}.tabs button.on{background:var(--panel);color:var(--ink);box-shadow:var(--sh)}
+.empty{text-align:center;margin:12vh auto;max-width:36ch}
+.sec{padding:16px;margin:12px 0}.sec>h3{margin:0 0 10px;font-size:15px;display:flex;gap:8px;align-items:center}
+.rw2{display:grid;grid-template-columns:1fr;gap:8px;padding:10px 0;border-top:1px solid var(--rule)}.rw2:first-of-type{border-top:0}
+@container (min-width:660px){.rs2 .rw2{grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:16px}}
+.noreason .why2{display:none}.noreason .rw2{grid-template-columns:1fr!important}
+.txt{font-size:14px}.txt b{color:var(--ink);background:linear-gradient(transparent 62%,var(--accs) 62%)}
+.rm .txt{text-decoration:line-through;color:var(--mute)}
+.why2{font-size:12.5px;background:var(--paper);border-radius:10px;padding:9px 11px}.why2 div{margin:3px 0}.why2 i{font-style:normal;font-weight:700;color:var(--mute);display:inline-block;min-width:38px}
+.cmp{display:grid;grid-template-columns:1fr;gap:8px;margin-top:8px}@container (min-width:660px){.cmp{grid-template-columns:1fr 1fr}}
+.cmp>div{border:1px solid var(--rule);border-radius:10px;padding:9px;font-size:13px;background:var(--panel)}.cmp .a{background:var(--oks);border-color:transparent}
+mark{background:var(--mark);color:inherit;border-radius:3px;padding:0 2px}
+table{border-collapse:collapse;width:100%;font-size:13px}td,th{border-bottom:1px solid var(--rule);padding:7px 6px;text-align:left}
+.big{font-size:40px;font-weight:700;line-height:1}
+.spin{width:26px;height:26px;border:3px solid var(--track);border-top-color:var(--acc);border-radius:50%;animation:sp .8s linear infinite;margin:0 auto 12px}@keyframes sp{to{transform:rotate(360deg)}}
+.sk{height:84px;border-radius:14px;margin:10px 0;background:linear-gradient(90deg,var(--track),var(--panel),var(--track));background-size:200% 100%;animation:sh 1.2s linear infinite}@keyframes sh{to{background-position:-200% 0}}
+.stat{flex:1;min-width:110px}
+@media(prefers-reduced-motion:reduce){.chev{transition:none}.spin,.sk{animation:none}}
+#aiset .edit::before{content:"Change"}#aiset[open] .edit::before{content:"Collapse"}</style>
+</head>
+<body>
+<main>
+<section class="pane l">
+  <div class="brand"><div class="logo">R</div><div><h1>Resume Optimiser</h1><div class="mute">Score against a job, then rewrite only from your own experience.</div></div></div>
+  <details id="aiset" class="card inputs">
+    <summary><span class="sumt">AI settings</span><span id="keyst" class="pill"></span><span class="edit"></span></summary>
+    <div class="ig"><div class="in"><b><label for="gk">Gemini API key (free)</label></b>
+      <input id="gk" type="password" autocomplete="off" spellcheck="false" placeholder="Paste your key from aistudio.google.com/apikey" style="width:100%;margin-top:6px;border:1px solid var(--rule);border-radius:8px;padding:8px;font:13px ui-monospace,Consolas,monospace;background:var(--panel);color:var(--ink)">
+      <label for="gm" class="mute" style="display:block;margin-top:8px">Model</label>
+      <select id="gm" style="margin-top:4px;border:1px solid var(--rule);border-radius:8px;padding:7px;background:var(--panel);color:var(--ink);font:inherit"><option value="gemini-2.5-flash">Gemini 2.5 Flash (best quality)</option><option value="gemini-2.5-flash-lite">Gemini 2.5 Flash-Lite (higher free limits)</option></select>
+      <p class="mute" style="margin:8px 0 0">The key stays in this browser only. Your files are read in your browser and only their text is sent to Google's Gemini API.</p></div></div>
+  </details>
+  <details id="inp" class="card inputs" open>
+    <summary><span class="sumt">Inputs</span><span id="chips" class="row" style="gap:6px"></span><span class="edit"></span></summary>
+    <div class="ig">
+      <div class="in"><b><span class="n">1</span><label for="fr">Current resume (.docx, formatting is kept)</label></b><input id="fr" type="file" accept=".docx"></div>
+      <div class="in"><b><span class="n">2</span><label for="up">Uber experience file</label></b><input id="fu" type="file" accept=".docx,.txt,.md"><textarea id="up" placeholder="Upload a file or paste text"></textarea></div>
+      <div class="in"><b><span class="n">3</span><label for="pj">Projects description (include links)</label></b><input id="fp" type="file" accept=".docx,.txt,.md"><textarea id="pj" placeholder="Upload a file or paste text"></textarea></div>
+      <div class="in"><b><span class="n">4</span><label for="jd">Job description</label></b><input id="fj" type="file" accept=".docx,.txt,.md"><textarea id="jd" placeholder="Upload a file or paste text"></textarea></div>
+    </div>
+  </details>
+  <div class="row"><button id="bs" class="p">Analyse match</button><button id="br" disabled>Rewrite my resume</button></div>
+  <div id="status" role="status"></div><div id="notice" class="mute"></div>
+  <div id="an"></div>
+</section>
+<section class="pane r">
+  <div class="bar"><div class="row"><button class="p" id="dd" disabled>Download Word (.docx)</button><button id="dp" disabled>Download PDF</button></div>
+  <div class="tabs" role="tablist"><button class="on" data-t="res">Updated sections</button><button data-t="chg">Before and after</button><button data-t="kw">Keywords</button></div></div>
+  <div id="t-res"><div class="empty"><div class="logo" style="margin:0 auto 12px;width:46px;height:46px">✦</div><b>Your updated sections appear here</b><p class="mute">Add your four inputs, analyse the match, then rewrite.</p></div></div>
+  <div id="t-chg" hidden></div><div id="t-kw" hidden></div>
+</section>
+</main>
+<script>
+/* Standalone shim: replaces the claude.ai-only helpers with the free Gemini API and a normal browser download. */
+(function(){
+ var KEY='ro_gemini_key',MODEL='ro_gemini_model';
+ var get=function(k){try{return localStorage.getItem(k)||''}catch(e){return''}},set=function(k,v){try{localStorage.setItem(k,v)}catch(e){}};
+ var sleep=function(ms){return new Promise(function(r){setTimeout(r,ms)})};
+ function parse(t){t=String(t||'').replace(/^\s*```(?:json)?/i,'').replace(/```\s*$/,'').trim();try{return JSON.parse(t)}catch(e){var a=t.indexOf('{'),b=t.lastIndexOf('}');if(a>=0&&b>a)return JSON.parse(t.slice(a,b+1));throw Error('The AI reply was not valid JSON. Please try again.')}}
+ async function json(prompt,opts){
+  var k=get(KEY);if(!k)throw Error('Add your free Gemini API key under "AI settings" first.');
+  var model=get(MODEL)||'gemini-2.5-flash',url='https://generativelanguage.googleapis.com/v1beta/models/'+model+':generateContent';
+  var body=JSON.stringify({contents:[{role:'user',parts:[{text:prompt}]}],generationConfig:{responseMimeType:'application/json',temperature:0.2}});
+  var last='';
+  for(var a=0;a<4;a++){
+   var res;try{res=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':k},body:body})}catch(e){throw Error('Could not reach the Gemini API. Check your internet connection.')}
+   if(res.ok){var d=await res.json(),c=(d.candidates||[])[0],parts=(c&&c.content&&c.content.parts)||[],text=parts.map(function(p){return p.text||''}).join('');
+    if(!text)throw Error('The AI returned an empty reply'+(c&&c.finishReason?' ('+c.finishReason+')':'')+'. Please try again.');
+    if(opts&&opts.onText)opts.onText({text:text});return parse(text)}
+   var msg='';try{msg=((await res.json()).error||{}).message||''}catch(e){}last=res.status+(msg?': '+msg:'');
+   if(res.status===400||res.status===401||res.status===403)throw Error('Gemini rejected the request ('+last+'). Check that your API key is correct.');
+   if(res.status===429||res.status>=500){await sleep(4000*(a+1));continue}
+   throw Error('Gemini error '+last)}
+  if(/^429/.test(last))throw Error('Free-tier limit reached. Wait a minute and try again, or switch the model to Flash-Lite under AI settings.');
+  throw Error('Gemini is busy right now ('+last+'). Please try again.')}
+ var dl={save:async function(o){var u=URL.createObjectURL(o.data),a=document.createElement('a');a.href=u;a.download=o.filename;document.body.appendChild(a);a.click();a.remove();setTimeout(function(){URL.revokeObjectURL(u)},4000)}};
+ window.claude={use:async function(n){if(n==='sample')return{json:json};if(n==='downloads')return dl;throw Error('Unknown helper '+n)}};
+ window.__ro={get:get,set:set,KEY:KEY,MODEL:MODEL};
+})();
+</script>
+<script>
+var NS='http://schemas.openxmlformats.org/wordprocessingml/2006/main',WT={skills:.4,title:.25,hard:.2,narr:.15},FN={skills:'Skills coverage',title:'Title and seniority',hard:'Hard requirements',narr:'Narrative and scope'};
+var $=function(i){return document.getElementById(i)},esc=function(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})};
+var S={buf:null,fname:'',zip:null,doc:null,paras:[],an:null,rw:null,origText:null,sample:null,dl:null,reason:true};
+var tg=function(n,t){return Array.prototype.slice.call(n.getElementsByTagNameNS(NS,t))};
+var ptext=function(p){return tg(p,'t').map(function(t){return t.textContent}).join('')};
+var wc=function(s){return (String(s||'').trim().match(/\S+/g)||[]).length};
+var col=function(s){return s>=75?'var(--ok)':s>=50?'var(--warn)':'var(--bad)'};
+var ring=function(v,cls){return '<div class="ring '+(cls||'')+'" style="--p:'+v+';--c:'+col(v)+'"><span>'+v+'</span></div>'};
+var RNS='http://schemas.openxmlformats.org/officeDocument/2006/relationships';
+async function parseDocx(buf){var zip=await JSZip.loadAsync(buf),f=zip.file('word/document.xml');if(!f)throw Error('Not a valid .docx file');var doc=new DOMParser().parseFromString(await f.async('string'),'application/xml');
+ var rf=zip.file('word/_rels/document.xml.rels'),relDoc=rf?new DOMParser().parseFromString(await rf.async('string'),'application/xml'):null,rels={};
+ if(relDoc)Array.prototype.forEach.call(relDoc.getElementsByTagName('Relationship'),function(r){rels[r.getAttribute('Id')]=r.getAttribute('Target')});
+ return{zip:zip,doc:doc,paras:tg(doc,'p'),rels:rels,relDoc:relDoc}}
+/* text of a paragraph with hyperlink targets appended, e.g. "Link (https://...)" */
+function walk(n,rels,st){for(var c=n.firstChild;c;c=c.nextSibling){if(c.nodeType!==1)continue;var l=c.localName;
+ if(l==='t')st.s+=c.textContent;else if(l==='tab')st.s+=' ';
+ else if(l==='instrText'){var m=c.textContent.match(/HYPERLINK\s+"([^"]+)"/);if(m)st.u=m[1]}
+ else if(l==='fldChar'&&c.getAttributeNS(NS,'fldCharType')==='end'&&st.u){st.s+=' ('+st.u+')';st.u=null}
+ else if(l==='hyperlink'){walk(c,rels,st);var id=c.getAttributeNS(RNS,'id'),u=id&&rels[id];if(u)st.s+=' ('+u+')'}
+ else walk(c,rels,st)}}
+function ptextL(p,rels){var st={s:'',u:null};walk(p,rels,st);return st.s}
+async function loadResume(){var d=await parseDocx(S.buf);S.zip=d.zip;S.doc=d.doc;S.paras=d.paras;S.relDoc=d.relDoc;if(S.origText==null)S.origText=resumeText()}
+async function readAny(f){if(/\.docx$/i.test(f.name)){var d=await parseDocx(await f.arrayBuffer());return d.paras.map(function(p){return ptextL(p,d.rels)}).filter(function(t){return t.trim()}).join('\n')}return f.text()}
+function resumeText(){return S.paras.map(ptext).filter(function(t){return t.trim()}).join('\n')}
+function indexed(){return S.paras.map(function(p,i){return[i,ptext(p).trim()]}).filter(function(x){return x[1]}).map(function(x){return x[0]+'| '+x[1]}).join('\n')}
+function chips(){var it=[['Resume',S.buf?S.fname:''],['Uber',wc($('up').value)?wc($('up').value)+' words':''],['Projects',wc($('pj').value)?wc($('pj').value)+' words':''],['Job',wc($('jd').value)?wc($('jd').value)+' words':'']];
+ $('chips').innerHTML=it.map(function(i){return '<span class="pill '+(i[1]?'ok':'')+'">'+(i[1]?'✓ ':'')+i[0]+(i[1]?' · '+esc(i[1]):'')+'</span>'}).join('')}
+chips();['up','pj','jd'].forEach(function(i){$(i).oninput=chips});
+function ready(){$('notice').textContent=S.sample?'':'AI features need this page opened in claude.ai while signed in.';$('bs').disabled=!S.sample}
+(async function(){try{S.sample=window.claude&&await claude.use('sample')}catch(e){}try{S.dl=window.claude&&await claude.use('downloads')}catch(e){}ready()})();
+$('fr').onchange=async function(e){try{var f=e.target.files[0];S.origText=null;S.buf=await f.arrayBuffer();S.fname=f.name;await loadResume();chips()}catch(x){$('status').innerHTML='<span class="err">'+esc(x.message)+'</span>'}};
+[['fu','up'],['fp','pj'],['fj','jd']].forEach(function(p){$(p[0]).onchange=async function(e){try{$(p[1]).value=await readAny(e.target.files[0]);chips()}catch(x){$('status').innerHTML='<span class="err">'+esc(x.message)+'</span>'}}});
+document.querySelectorAll('.tabs button').forEach(function(b){b.onclick=function(){document.querySelectorAll('.tabs button').forEach(function(x){x.classList.toggle('on',x===b)});['res','chg','kw'].forEach(function(t){$('t-'+t).hidden=t!==b.dataset.t})}});
+async function ask(prompt,label){$('status').textContent=label+'…';return S.sample.json(prompt,{cache:false,onText:function(u){$('status').textContent=label+'… '+u.text.length+' characters'}})}
+function need(){if(!S.buf){$('inp').open=true;$('status').innerHTML='<span class="err">Upload your resume (.docx) first.</span>';return false}if(!$('jd').value.trim()){$('inp').open=true;$('status').innerHTML='<span class="err">Add the job description.</span>';return false}return true}
+function overall(s){return Math.round(['skills','title','hard','narr'].reduce(function(a,k){return a+(+s[k]||0)*WT[k]},0))}
+
+/* ---------- Analyse ---------- */
+var EMPTY='<div class="empty"><div class="logo" style="margin:0 auto 12px;width:46px;height:46px">✦</div><b>Your updated sections appear here</b><p class="mute">Add your four inputs, analyse the match, then rewrite.</p></div>';
+function busy(msg){return '<div class="empty"><div class="spin"></div><b>'+msg+'</b><p class="mute">This can take up to a minute.</p></div>'}
+function resetOut(msg,keepAn){S.rw=null;S.limitProblems=[];$('dd').disabled=true;$('dp').disabled=true;$('t-res').innerHTML=busy(msg);$('t-chg').innerHTML='';$('t-kw').innerHTML='';if(!keepAn)$('an').innerHTML='<h2>ATS match</h2><div class="sk"></div><div class="sk"></div><div class="sk"></div><div class="sk"></div>'}
+$('bs').onclick=async function(){if(!need())return;$('bs').disabled=true;$('br').disabled=true;$('inp').open=false;resetOut('Analysing your resume');
+ try{S.an=null;S.an=await ask('You are an ATS analyst modelled on Workday-style screening. Compare the RESUME with the JOB DESCRIPTION. Return ONLY JSON, no markdown:\n{"role":"JD title","aligned":"strong|moderate|weak","alignment_note":"1-2 sentences","blockers":["hard blockers if any"],"factors":{"skills":F,"title":F,"hard":F,"narr":F}}\nwhere F={"score":0-100,"reason":"2 sentences on why this score","items":[{"label":"short","status":"match|partial|missing","where":"quote of 12 words max from the resume proving it, or empty","note":"one sentence on why it affects the score"}]} with 6-12 items per factor.\nskills: JD required/preferred skills, tools, methods. title: title, seniority and domain fit. hard: years of experience, degree, certifications, location and anything mandatory. narr: JD duties versus the scope, scale and outcomes the resume bullets show. Be strict and consistent.\nRESUME:\n'+resumeText()+'\nJOB DESCRIPTION:\n'+$('jd').value,'Analysing');
+  $('status').textContent='';renderAn();$('br').disabled=false;$('br').textContent=S.an.aligned==='weak'?'Rewrite anyway':'Rewrite my resume'}
+ catch(e){$('an').innerHTML='';$('t-res').innerHTML=EMPTY;$('status').innerHTML='<span class="err">'+esc(e.message||e.code||'Failed')+'</span>'}$('bs').disabled=false;if(S.an)$('t-res').innerHTML='<div class="empty"><b>Analysis ready</b><p class="mute">Select “'+$('br').textContent+'” to generate your updated sections.</p></div>'};
+function renderAn(){var a=S.an,sc={};Object.keys(WT).forEach(function(k){sc[k]=Math.round(+a.factors[k].score||0)});var ov=overall(sc),af=S.rw&&S.rw.after_scores,ao=af?overall(af):null,cur=ao!=null?ao:ov,vc=a.aligned==='strong'?'ok':a.aligned==='weak'?'bad':'warn';
+ var h='<h2>ATS match</h2><div class="card hero">'+ring(cur,'xl')+'<div><div style="font-size:16px;font-weight:700">'+(ao!=null?'After rewrite':'Current match')+(ao!=null?' <span class="pill ok">+'+(ao-ov)+' pts</span>':'')+'</div><div class="mute">'+(ao!=null?'Estimated. Was '+ov+'%.':'Estimated by Claude, not by Workday itself.')+'</div><div class="mute" style="margin-top:4px">'+esc(a.role||'')+'</div></div></div>';
+ h+='<div class="verdict '+vc+'"><b>Role alignment: '+esc(a.aligned)+'</b><div>'+esc(a.alignment_note)+'</div>'+((a.blockers||[]).length?'<div style="margin-top:6px">'+a.blockers.map(function(b){return '<span class="pill bd">'+esc(b)+'</span> '}).join('')+'</div>':'')+(a.aligned==='weak'?'<div style="margin-top:6px">Rewriting only rephrases real experience. It cannot close a gap that is genuinely there.</div>':'')+'</div>';
+ h+='<h2>Score breakdown</h2>';
+ Object.keys(WT).forEach(function(k){var f=a.factors[k],it=f.items||[],g={match:[],partial:[],missing:[]};it.forEach(function(i){(g[i.status]||g.missing).push(i)});var v=af?Math.round(af[k]):sc[k];
+  h+='<details class="card fac"><summary>'+ring(v)+'<div><h3>'+FN[k]+'<span class="pill ac">'+WT[k]*100+'% weight</span>'+(af?'<span class="pill">was '+sc[k]+'</span>':'')+'</h3><div class="rs">'+esc(f.reason)+'</div><div class="row" style="gap:6px"><span class="pill ok">'+g.match.length+' matched</span><span class="pill wn">'+g.partial.length+' partial</span><span class="pill bd">'+g.missing.length+' missing</span></div></div><svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg></summary><div class="fb">';
+  [['missing','Missing','bad'],['partial','Partial','warn'],['match','Matched','ok']].forEach(function(s){if(!g[s[0]].length)return;h+='<div class="grp" style="color:var(--'+s[2]+')">'+s[1]+'</div>'+g[s[0]].map(function(i){return '<div class="it '+s[0]+'"><b>'+esc(i.label)+'</b>'+(i.where?' <q>“'+esc(i.where)+'”</q>':'')+'<div class="mute">'+esc(i.note)+'</div></div>'}).join('')});
+  h+='</div></details>'});
+ if(S.rw&&(S.rw.remaining_gaps||[]).length)h+='<h2>Still missing after rewrite</h2><div class="row" style="gap:6px">'+S.rw.remaining_gaps.map(function(g){return '<span class="pill wn">'+esc(g)+'</span>'}).join('')+'</div>';
+ $('an').innerHTML=h}
+
+/* ---------- Rewrite ---------- */
+var RULES='RULES: Use ONLY facts in the RESUME, UBER FILE and PROJECTS FILE. Every number, percentage, tool and employer you write must appear in those files; copy numbers exactly, keep "~" where the source says approximate, never round, estimate or invent a metric. If a bullet has no verified number, write the result without one. Use a JD keyword only where it is a truthful description of something in the files. Bullets: one or two lines, past tense, start with a varied action verb, say what was done, how (tools) and the outcome. Skills: only skills evidenced in the files, JD-relevant first.';
+function rwPrompt(fb){return 'You edit a resume to fit a job description without inventing anything. Return ONLY JSON, no markdown.\n'+RULES+'\nBULLET EDITING: review every existing bullet in the Uber and TopN sections against the JD. For each, decide KEEP (already strong), REWRITE (same fact, better wording and keywords), REMOVE (irrelevant or weak for this JD), and ADD new bullets when the files support a JD-relevant achievement that is not on the resume yet. Order bullets by JD relevance.\nBULLET QUALITY: Start each bullet with a strong, specific verb (Built, Automated, Reduced, Designed, Led, Streamlined, Analysed, Delivered). Never start with "Responsible for", "Worked on", "Helped", "Assisted" or "Involved in". Structure: strong verb + what you did + how (tools or method) + result. The result must be concrete: use a verified number from the files where one exists; otherwise state the real outcome in plain words (what changed, who benefited, what got faster or simpler). Never invent a figure. Do not use the same opening verb twice across the whole resume. Before answering, check every bullet against these rules and fix any that fail.\nBULLET QUALITY: Start each bullet with a strong, specific verb (Built, Automated, Reduced, Designed, Led, Streamlined, Analysed, Delivered). Never start with \"Responsible for\", \"Worked on\", \"Helped\", \"Assisted\" or \"Involved in\". Structure: strong verb + what you did + how (tools or method) + result. The result must be concrete: use a verified number from the files where one exists; otherwise state the real outcome in plain words (what changed, who benefited, what got faster or simpler). Never invent a figure. Use no verb twice across the whole resume. Before answering, check every bullet against these rules and fix any that fail.\nLIMITS (final lists): summary 40-60 words; Uber 3-6 bullets; TopN Analytics 1-2 bullets; projects: exactly 2, the best JD fit from the PROJECTS FILE, each 1-2 bullets. For each project give "tools": the tools and languages listed on the title line of that project in the PROJECTS FILE (format "Name | Tools | Link (url)"), plus any other tool the description of that project names, comma-separated; and "link": the exact URL in parentheses after "Link" or "GitHub" on that title line (empty string only if there is none). Never invent a URL or a tool.\nThe RESUME is given as "index| text" paragraphs. In "layout", give the paragraph indexes of each existing section so the new text can replace them: "paras" = every paragraph of that section body (all bullets, not the heading or the role/company line), "tpl" = the index of one bullet paragraph whose formatting to reuse. For projects give "titleTpl" and "bulletTpl". Use null for a section that does not exist.\nSchema:\n{"layout":{"summary":{"tpl":0,"paras":[0]},"uber":{"tpl":0,"paras":[0]},"topn":{"tpl":0,"paras":[0]},"projects":{"titleTpl":0,"bulletTpl":0,"paras":[0]},"skills":{"tpl":0,"paras":[0]}},"summary":"","uber":[""],"topn":[""],"projects":[{"name":"","tools":"","link":"","bullets":[""]}],"skills":["Category: item, item"],"bold_terms":["JD keywords, skills, tools and methods that appear in the new text, 20-40"],"changes":[{"section":"Professional Summary|Uber|TopN Analytics|Project: name|Skills","action":"keep|rewrite|add|remove","before":"original text, empty if new","after":"exact final text, empty if removed","what":"what changed","why":"which JD requirement or keyword it targets, or why it was removed or kept","how":"how the wording changed","keywords_added":["exact words in after that come from the JD"],"source":"where in the files the facts come from"}],"keywords":[{"kw":"JD keyword","in_before":true,"in_after":true}],"after_scores":{"skills":0,"title":0,"hard":0,"narr":0},"remaining_gaps":["JD requirements still not evidenced"]}\nOne change entry per original bullet (keep, rewrite or remove), one per added bullet, one for the summary, one for skills, and one per project bullet. "after" must equal the final bullet text exactly. 15-25 keywords.'+(fb?'\nFIX THESE PROBLEMS FROM YOUR LAST ATTEMPT: '+fb:'')+'\nRESUME:\n'+indexed()+'\nUBER FILE:\n'+$('up').value+'\nPROJECTS FILE:\n'+$('pj').value+'\nJOB DESCRIPTION:\n'+$('jd').value}
+function limits(r){var p=[],n=function(a){return(a||[]).length},L=r.layout||{};var w=wc(r.summary);if(w<40||w>60)p.push('summary is '+w+' words, must be 40-60');
+ if(L.uber&&(n(r.uber)<3||n(r.uber)>6))p.push('Uber has '+n(r.uber)+' bullets, must be 3-6');if(L.topn&&(n(r.topn)<1||n(r.topn)>2))p.push('TopN has '+n(r.topn)+' bullets, must be 1-2');
+ if(n(r.projects)!==2)p.push('need exactly 2 projects');(r.projects||[]).forEach(function(x){if(n(x.bullets)<1||n(x.bullets)>2)p.push('project '+x.name+' has '+n(x.bullets)+' bullets, must be 1-2')});return p}
+$('br').onclick=async function(){if(!need())return;if(!$('up').value.trim()||!$('pj').value.trim()){$('inp').open=true;$('status').innerHTML='<span class="err">Add the Uber experience and Projects files first.</span>';return}
+ $('br').disabled=true;$('bs').disabled=true;resetOut('Rewriting your resume',true);if(S.an)renderAn();
+ try{var r=await ask(rwPrompt(''),'Rewriting'),pr=limits(r);if(pr.length){r=await ask(rwPrompt(pr.join('; ')),'Fixing section limits');pr=limits(r)}
+  S.rw=r;S.limitProblems=pr;await loadResume();apply(r);$('status').textContent='';$('dd').disabled=false;$('dp').disabled=false;renderAn();renderAll()}
+ catch(e){$('t-res').innerHTML='<div class="empty"><b>Rewrite did not finish</b><p class="mute">Try again.</p></div>';$('status').innerHTML='<span class="err">'+esc(e.message||e.code||'Failed')+'</span>'}$('br').disabled=false;$('bs').disabled=false};
+
+/* ---------- docx editing: clone original paragraphs, bold key terms ---------- */
+function segs(text,terms){var T=(terms||[]).filter(Boolean).map(function(t){return String(t).trim()}).filter(Boolean).sort(function(a,b){return b.length-a.length}).map(function(t){return t.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')});
+ var src=(T.length?'(?<![\\w])(?:'+T.join('|')+')(?![\\w])|':'')+'\\$?\\d[\\d,]*(?:\\.\\d+)?(?:\\s?(?:%|\\+|(?:k|x|hrs?|mins?)(?![A-Za-z])))?',re=new RegExp(src,'gi'),out=[],i=0,m;
+ while((m=re.exec(text))){if(m.index>i)out.push({t:text.slice(i,m.index),b:0});out.push({t:m[0],b:1});i=m.index+m[0].length}if(i<text.length)out.push({t:text.slice(i),b:0});return out}
+function setBold(r,on){var rp=null;for(var c=r.firstElementChild;c;c=c.nextElementSibling)if(c.localName==='rPr')rp=c;
+ if(!rp){if(!on)return;rp=r.ownerDocument.createElementNS(NS,'w:rPr');r.insertBefore(rp,r.firstChild)}
+ var b=null;for(var c2=rp.firstElementChild;c2;c2=c2.nextElementSibling)if(c2.localName==='b')b=c2;
+ if(on){if(b){b.removeAttributeNS(NS,'val');b.removeAttribute('w:val')}else{b=r.ownerDocument.createElementNS(NS,'w:b');var at=rp.firstChild;while(at&&(at.localName==='rStyle'||at.localName==='rFonts'))at=at.nextSibling;rp.insertBefore(b,at)}}else if(b)rp.removeChild(b)}
+function put(r,t){var ts=tg(r,'t');ts[0].textContent=t;ts[0].setAttribute('xml:space','preserve');ts.slice(1).forEach(function(x){x.remove()})}
+var HL='http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink';
+function addLink(p,url,label){if(!url||!S.relDoc)return;var rd=S.relDoc,root=rd.documentElement,n=1;Array.prototype.forEach.call(rd.getElementsByTagName('Relationship'),function(r){var m=/^rId(\d+)$/.exec(r.getAttribute('Id')||'');if(m&&+m[1]>=n)n=+m[1]+1});
+ var id='rId'+n,rel=rd.createElementNS(root.namespaceURI,'Relationship');rel.setAttribute('Id',id);rel.setAttribute('Type',HL);rel.setAttribute('Target',url);rel.setAttribute('TargetMode','External');root.appendChild(rel);
+ var runs=tg(p,'r'),base=runs.length?runs[0].cloneNode(true):p.ownerDocument.createElementNS(NS,'w:r');tg(base,'t').forEach(function(x){x.remove()});
+ var rp=null;for(var c=base.firstElementChild;c;c=c.nextElementSibling)if(c.localName==='rPr')rp=c;if(!rp){rp=p.ownerDocument.createElementNS(NS,'w:rPr');base.insertBefore(rp,base.firstChild)}
+ Array.prototype.slice.call(rp.children).forEach(function(x){if(['b','bCs','color','u'].indexOf(x.localName)>=0)rp.removeChild(x)});
+ var col=p.ownerDocument.createElementNS(NS,'w:color');col.setAttributeNS(NS,'w:val','0563C1');rp.appendChild(col);var u=p.ownerDocument.createElementNS(NS,'w:u');u.setAttributeNS(NS,'w:val','single');rp.appendChild(u);
+ var t=p.ownerDocument.createElementNS(NS,'w:t');t.textContent=label||'Link';base.appendChild(t);
+ var h=p.ownerDocument.createElementNS(NS,'w:hyperlink');h.setAttributeNS(RNS,'r:id',id);h.setAttribute('w:history','1');h.appendChild(base);p.appendChild(h)}
+function setText(p,text,delim,terms,link){var runs=tg(p,'r').filter(function(r){return tg(r,'t').length});if(!runs.length)return;var keep=[],k=delim?text.indexOf(delim):-1;
+ if(delim&&runs.length>1&&k>0){var cut=delim===':'?k+1:k;put(runs[0],text.slice(0,cut)+(delim===':'?' ':''));put(runs[1],text.slice(cut).replace(/^\s+/,delim===':'?'':' '));keep=[runs[0],runs[1]]}
+ else if(terms){var par=runs[0].parentNode,base=runs[0].cloneNode(true);segs(text,terms).forEach(function(s){var r=base.cloneNode(true);put(r,s.t);setBold(r,s.b);par.insertBefore(r,runs[0])})}
+ else{put(runs[0],text);keep=[runs[0]]}
+ runs.forEach(function(r){if(keep.indexOf(r)<0)r.parentNode&&r.parentNode.removeChild(r)});tg(p,'hyperlink').forEach(function(h){if(!tg(h,'r').length)h.remove()});
+ if(link)addLink(p,link,'Link')}
+function replaceSection(idxs,items){if(!idxs||!idxs.length||!S.paras[idxs[0]])return;var first=S.paras[idxs[0]],par=first.parentNode;
+ items.forEach(function(it){var tpl=S.paras[it.tpl]||first,c=tpl.cloneNode(true);setText(c,it.text,it.delim,it.terms,it.link);par.insertBefore(c,first)});
+ idxs.forEach(function(i){var p=S.paras[i];if(p&&p.parentNode)p.parentNode.removeChild(p)})}
+function projTitle(p){return p.name+(p.tools?' | '+p.tools:'')+(p.link?' | ':'')}
+function apply(r){var L=r.layout||{},T=r.bold_terms||[],sec=function(o,arr,delim,terms){if(o&&o.paras&&arr)replaceSection(o.paras,arr.map(function(t){return{tpl:o.tpl,text:t,delim:delim,terms:terms}}))};
+ sec(L.summary,[r.summary],null,T);sec(L.uber,r.uber,null,T);sec(L.topn,r.topn,null,T);sec(L.skills,r.skills,':',null);var P=L.projects;
+ if(P&&P.paras){var it=[];(r.projects||[]).forEach(function(p){it.push({tpl:P.titleTpl,text:projTitle(p),delim:' | ',link:p.link});(p.bullets||[]).forEach(function(b){it.push({tpl:P.bulletTpl,text:b,terms:T})})});replaceSection(P.paras,it)}}
+
+/* ---------- right pane ---------- */
+var norm=function(s){return String(s||'').toLowerCase().replace(/\s+/g,' ').trim()};
+function emph(t){return segs(t,S.rw.bold_terms).map(function(s){return s.b?'<b>'+esc(s.t)+'</b>':esc(s.t)}).join('')}
+function hl(t,k){var h=esc(t);(k||[]).forEach(function(w){if(!w)return;var e=esc(w).replace(/[.*+?^${}()|[\]\\]/g,'\\$&');h=h.replace(new RegExp('('+e+')','ig'),'<mark>$1</mark>')});return h}
+var AC={keep:['Kept','pill'],rewrite:['Rewritten','pill ac'],add:['Added','pill ok'],remove:['Removed','pill bd']};
+function badge(c){var a=AC[c&&c.action]||['Updated','pill ac'];return '<span class="'+a[1]+'">'+a[0]+'</span>'}
+function why(c){if(!c)return'';return '<div class="why2">'+badge(c)+'<div><i>What</i>'+esc(c.what)+'</div><div><i>Why</i>'+esc(c.why)+'</div><div><i>How</i>'+esc(c.how)+'</div>'+((c.keywords_added||[]).length?'<div style="margin-top:5px">'+c.keywords_added.map(function(k){return '<span class="pill wn">+ '+esc(k)+'</span> '}).join('')+'</div>':'')+'</div>'}
+function rowH(text,c,cls){return '<div class="rw2 '+(cls||'')+'"><div class="txt">'+(cls==='rm'?esc(text):emph(text))+'</div><div class="why2-wrap">'+why(c)+'</div></div>'}
+function unverified(){var src=(S.origText||'')+' '+$('up').value+' '+$('pj').value,r=S.rw,txt=[r.summary].concat(r.uber||[],r.topn||[]);(r.projects||[]).forEach(function(p){txt=txt.concat(p.bullets||[])});var bad={};
+ txt.join(' ').replace(/\d[\d,]*(?:\.\d+)?\s?(?:%|\+)?/g,function(m){m=m.trim();if(m&&src.indexOf(m)<0)bad[m]=1});return Object.keys(bad)}
+function renderAll(){var r=S.rw,u=unverified(),lp=S.limitProblems||[],m={},n=function(a){return(a||[]).length};(r.changes||[]).forEach(function(c){if(c.after)m[norm(c.after)]=c});
+ var sec=function(p){return(r.changes||[]).filter(function(c){return norm(c.section).indexOf(p)===0})};
+ var top='<div class="row" style="gap:6px;margin-bottom:10px">'+chip('Summary '+wc(r.summary)+' words',wc(r.summary)>=40&&wc(r.summary)<=60)+chip('Uber '+n(r.uber)+' bullets',n(r.uber)>=3&&n(r.uber)<=6)+((r.layout||{}).topn?chip('TopN '+n(r.topn)+' bullets',n(r.topn)>=1&&n(r.topn)<=2):'')+chip(n(r.projects)+' projects',n(r.projects)===2)+(u.length?'':'<span class="pill ok">All numbers match your files</span>')+'<label class="mute" style="margin-left:auto"><input type="checkbox" id="rz" '+(S.reason?'checked':'')+'> Show reasoning</label></div>';
+ if(lp.length)top+='<div class="verdict bad">Limits not met: '+esc(lp.join('; '))+'</div>';
+ if(u.length)top+='<div class="verdict warn"><b>Check these numbers</b><div>Not found in your files: '+u.map(function(x){return '<span class="pill wn">'+esc(x)+'</span>'}).join(' ')+' Confirm they are real or remove them before sending.</div></div>';
+ var h=top+'<div id="rs" class="rs2 '+(S.reason?'':'noreason')+'">';
+ h+='<div class="card sec"><h3>Professional Summary <span class="pill">'+wc(r.summary)+' words</span></h3>'+rowH(r.summary,sec('professional')[0])+'</div>';
+ var grp=function(label,list,pre){if(!(r.layout||{})[pre])return'';var rm=sec(label.toLowerCase().split(' ')[0]).filter(function(c){return c.action==='remove'});return '<div style="margin-top:6px"><b>'+label+'</b></div>'+(list||[]).map(function(b){return rowH(b,m[norm(b)])}).join('')+rm.map(function(c){return rowH(c.before,c,'rm')}).join('')};
+ h+='<div class="card sec"><h3>Experience</h3>'+grp('Uber',r.uber,'uber')+grp('TopN Analytics',r.topn,'topn')+'</div>';
+ h+='<div class="card sec"><h3>Projects <span class="pill">2 selected</span></h3>'+(r.projects||[]).map(function(p){return '<div style="margin-top:8px"><b>'+esc(p.name)+'</b>'+(p.tools?' <span class="mute">| '+esc(p.tools)+'</span>':'<span class="pill wn">no tools found</span>')+' '+(p.link?'<a href="'+esc(p.link)+'" target="_blank" rel="noopener" style="color:var(--acc);font-size:13px">Link</a>':'<span class="pill wn">no link in your file</span>')+'</div>'+(p.bullets||[]).map(function(b){return rowH(b,m[norm(b)])}).join('')}).join('')+'</div>';
+ h+='<div class="card sec"><h3>Skills</h3><div class="rw2"><div class="txt">'+(r.skills||[]).map(function(s){var k=s.indexOf(':');return k>0?'<div><b>'+esc(s.slice(0,k+1))+'</b>'+esc(s.slice(k+1))+'</div>':'<div>'+esc(s)+'</div>'}).join('')+'</div><div class="why2-wrap">'+why(sec('skills')[0])+'</div></div></div></div>';
+ $('t-res').innerHTML=h;$('rz').onchange=function(){S.reason=this.checked;$('rs').classList.toggle('noreason',!this.checked)};
+ var c='<p class="mute">Original next to the new text. Highlighted words come from the job description.</p>';
+ (r.changes||[]).forEach(function(x){c+='<div class="card sec"><h3>'+esc(x.section)+' '+badge(x)+'</h3><div class="cmp"><div><div class="mute">Before</div>'+esc(x.before||'(new bullet)')+'</div><div class="a"><div class="mute">After</div>'+(x.after?hl(x.after,x.keywords_added):'(removed)')+'</div></div><div class="why2" style="margin-top:8px"><div><i>What</i>'+esc(x.what)+'</div><div><i>Why</i>'+esc(x.why)+'</div><div><i>How</i>'+esc(x.how)+'</div><div class="mute"><i>Source</i>'+esc(x.source)+'</div></div></div>'});$('t-chg').innerHTML=c;
+ var k=r.keywords||[],bf=k.filter(function(x){return x.in_before}).length,af=k.filter(function(x){return x.in_after}).length,pc=function(v){return k.length?Math.round(v/k.length*100):0};
+ $('t-kw').innerHTML='<div class="card sec row" style="gap:36px"><div class="stat"><div class="big">'+pc(bf)+'%</div><div class="mute">JD keywords matched before</div></div><div class="stat"><div class="big" style="color:var(--ok)">'+pc(af)+'%</div><div class="mute">matched after rewrite</div></div></div><div class="card sec"><table><tr><th>Keyword<div class="mute" style="font-weight:500">'+k.length+' total</div></th><th>Before<div class="mute" style="font-weight:500">'+bf+' matched</div></th><th>After<div class="mute" style="font-weight:500">'+af+' matched</div></th></tr>'+k.map(function(x){return '<tr><td>'+esc(x.kw)+'</td><td>'+(x.in_before?'<span class="pill ok">Yes</span>':'<span class="pill bd">No</span>')+'</td><td>'+(x.in_after?'<span class="pill ok">Yes</span>':'<span class="pill wn">No</span>')+'</td></tr>'}).join('')+'</table></div><p class="mute">Keywords still missing need real experience. Add them only once you have it.</p>'}
+function chip(t,ok){return '<span class="pill '+(ok?'ok':'bd')+'">'+esc(t)+'</span>'}
+
+/* ---------- downloads ---------- */
+$('dd').onclick=async function(){try{var x=new XMLSerializer().serializeToString(S.doc);if(x.indexOf('<?xml')!==0)x='<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n'+x;S.zip.file('word/document.xml',x);if(S.relDoc)S.zip.file('word/_rels/document.xml.rels',new XMLSerializer().serializeToString(S.relDoc));
+ var blob=await S.zip.generateAsync({type:'blob',mimeType:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'});await save('Resume_Optimised.docx',blob)}catch(e){fail(e)}};
+$('dp').onclick=async function(){try{var J=window.jspdf.jsPDF,d=new J({unit:'pt',format:'a4'}),M=42,PW=d.internal.pageSize.getWidth()-2*M,y=44,cl=function(s){return s.replace(/[\u2013\u2014]/g,'-').replace(/[\u2018\u2019]/g,"'").replace(/[\u201C\u201D]/g,'"').replace(/[\u2022\u25CF\u25AA]/g,'-').replace(/[^\x00-\xFF]/g,'')};
+ tg(S.doc,'p').forEach(function(p){var toks=[],sz=10.5,bl=tg(p,'numPr').length>0;
+  tg(p,'r').forEach(function(r){var t=cl(tg(r,'t').map(function(x){return x.textContent}).join(''));if(!t)return;var s=tg(r,'sz')[0];if(s&&!toks.length)sz=Math.min(16,+s.getAttribute('w:val')/2||10.5);var b=tg(r,'b')[0],v=b&&b.getAttribute('w:val'),bold=!!b&&v!=='0'&&v!=='false';t.split(/(\s+)/).forEach(function(w){if(w)toks.push({w:w,b:bold})})});
+  if(!toks.length){y+=4;return}if(y>800){d.addPage();y=44}var x0=M+(bl?10:0),x=x0;if(bl){d.setFont('helvetica','normal');d.setFontSize(sz);d.text('-',M,y)}
+  toks.forEach(function(k){d.setFont('helvetica',k.b?'bold':'normal');d.setFontSize(sz);var w=d.getTextWidth(k.w);if(x+w>M+PW&&k.w.trim()){x=x0;y+=sz*1.3;if(y>800){d.addPage();y=44}}if(!(x===x0&&!k.w.trim())){d.text(k.w,x,y);x+=w}});y+=sz*1.3+2});
+ await save('Resume_Optimised.pdf',d.output('blob'))}catch(e){fail(e)}};
+async function save(n,b){if(!S.dl){$('status').innerHTML='<span class="err">Downloads need this page opened in claude.ai.</span>';return}await S.dl.save({filename:n,data:b})}
+function fail(e){if(e&&e.code==='declined')return;$('status').innerHTML='<span class="err">'+esc(e.message||e.code||'Download failed')+'</span>'}
+
+(function(){var R=window.__ro,gk=document.getElementById('gk'),gm=document.getElementById('gm'),st=document.getElementById('keyst'),box=document.getElementById('aiset');
+ function show(){var has=!!R.get(R.KEY);st.textContent=has?'Key saved':'Key needed';st.className='pill '+(has?'ok':'wn');if(!has)box.open=true}
+ gk.value=R.get(R.KEY);gm.value=R.get(R.MODEL)||'gemini-2.5-flash';show();
+ gk.oninput=function(){R.set(R.KEY,gk.value.trim());show()};gm.onchange=function(){R.set(R.MODEL,gm.value)}})();
+</script>
+</body>
+</html>
