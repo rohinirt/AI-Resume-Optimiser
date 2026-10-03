@@ -78,7 +78,7 @@ table{border-collapse:collapse;width:100%;font-size:13px}td,th{border-bottom:1px
     <div class="ig"><div class="in"><b><label for="gk">Gemini API key (free)</label></b>
       <input id="gk" type="password" autocomplete="off" spellcheck="false" placeholder="Paste your key from aistudio.google.com/apikey" style="width:100%;margin-top:6px;border:1px solid var(--rule);border-radius:8px;padding:8px;font:13px ui-monospace,Consolas,monospace;background:var(--panel);color:var(--ink)">
       <label for="gm" class="mute" style="display:block;margin-top:8px">Model</label>
-      <select id="gm" style="margin-top:4px;border:1px solid var(--rule);border-radius:8px;padding:7px;background:var(--panel);color:var(--ink);font:inherit"><option value="gemini-2.5-flash">Gemini 2.5 Flash (best quality)</option><option value="gemini-2.5-flash-lite">Gemini 2.5 Flash-Lite (higher free limits)</option></select>
+      <select id="gm" style="margin-top:4px;max-width:100%;border:1px solid var(--rule);border-radius:8px;padding:7px;background:var(--panel);color:var(--ink);font:inherit"><option value="gemini-3.8-flash">gemini-3.8-flash</option></select> <button id="gr" type="button" style="padding:6px 10px;font-size:13px">Refresh models</button><span id="gs" class="mute"></span>
       <p class="mute" style="margin:8px 0 0">The key stays in this browser only. Your files are read in your browser and only their text is sent to Google's Gemini API.</p></div></div>
   </details>
   <details id="inp" class="card inputs" open>
@@ -108,17 +108,26 @@ table{border-collapse:collapse;width:100%;font-size:13px}td,th{border-bottom:1px
  var get=function(k){try{return localStorage.getItem(k)||''}catch(e){return''}},set=function(k,v){try{localStorage.setItem(k,v)}catch(e){}};
  var sleep=function(ms){return new Promise(function(r){setTimeout(r,ms)})};
  function parse(t){t=String(t||'').replace(/^\s*```(?:json)?/i,'').replace(/```\s*$/,'').trim();try{return JSON.parse(t)}catch(e){var a=t.indexOf('{'),b=t.lastIndexOf('}');if(a>=0&&b>a)return JSON.parse(t.slice(a,b+1));throw Error('The AI reply was not valid JSON. Please try again.')}}
+ var BASE='https://generativelanguage.googleapis.com/v1beta/';
+ async function discover(k){var res=await fetch(BASE+'models?pageSize=200',{headers:{'x-goog-api-key':k}});if(!res.ok)throw Error('Could not list models ('+res.status+'). Check your API key.');
+  var d=await res.json(),ver=function(n){var m=/gemini-(\d+(?:\.\d+)?)/.exec(n);return m?parseFloat(m[1]):0};
+  return(d.models||[]).filter(function(m){var n=m.name||'';return(m.supportedGenerationMethods||[]).indexOf('generateContent')>=0&&/flash/.test(n)&&!/image|tts|live|audio|embed|robotics|computer|native/.test(n)})
+   .map(function(m){return{id:m.name.replace(/^models\//,''),label:m.displayName||m.name}})
+   .sort(function(a,b){return ver(b.id)-ver(a.id)||(/lite/.test(a.id)?1:0)-(/lite/.test(b.id)?1:0)||(/preview/.test(a.id)?1:0)-(/preview/.test(b.id)?1:0)})}
  async function json(prompt,opts){
   var k=get(KEY);if(!k)throw Error('Add your free Gemini API key under "AI settings" first.');
-  var model=get(MODEL)||'gemini-2.5-flash',url='https://generativelanguage.googleapis.com/v1beta/models/'+model+':generateContent';
+  var model=get(MODEL)||'gemini-3.8-flash',url;
   var body=JSON.stringify({contents:[{role:'user',parts:[{text:prompt}]}],generationConfig:{responseMimeType:'application/json',temperature:0.2}});
   var last='';
+  var healed=false;
   for(var a=0;a<4;a++){
-   var res;try{res=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':k},body:body})}catch(e){throw Error('Could not reach the Gemini API. Check your internet connection.')}
+   url=BASE+'models/'+model+':generateContent';var res;try{res=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':k},body:body})}catch(e){throw Error('Could not reach the Gemini API. Check your internet connection.')}
    if(res.ok){var d=await res.json(),c=(d.candidates||[])[0],parts=(c&&c.content&&c.content.parts)||[],text=parts.map(function(p){return p.text||''}).join('');
     if(!text)throw Error('The AI returned an empty reply'+(c&&c.finishReason?' ('+c.finishReason+')':'')+'. Please try again.');
     if(opts&&opts.onText)opts.onText({text:text});return parse(text)}
    var msg='';try{msg=((await res.json()).error||{}).message||''}catch(e){}last=res.status+(msg?': '+msg:'');
+   if(res.status===404&&!healed){healed=true;try{var L=await discover(k);if(L.length&&L[0].id!==model){model=L[0].id;set(MODEL,model);if(window.__ro.refresh)window.__ro.refresh();a--;continue}}catch(e){}}
+   if(res.status===404)throw Error('This Gemini model is not available to your key ('+last+'). Pick another model under AI settings.');
    if(res.status===400||res.status===401||res.status===403)throw Error('Gemini rejected the request ('+last+'). Check that your API key is correct.');
    if(res.status===429||res.status>=500){await sleep(4000*(a+1));continue}
    throw Error('Gemini error '+last)}
@@ -126,7 +135,7 @@ table{border-collapse:collapse;width:100%;font-size:13px}td,th{border-bottom:1px
   throw Error('Gemini is busy right now ('+last+'). Please try again.')}
  var dl={save:async function(o){var u=URL.createObjectURL(o.data),a=document.createElement('a');a.href=u;a.download=o.filename;document.body.appendChild(a);a.click();a.remove();setTimeout(function(){URL.revokeObjectURL(u)},4000)}};
  window.claude={use:async function(n){if(n==='sample')return{json:json};if(n==='downloads')return dl;throw Error('Unknown helper '+n)}};
- window.__ro={get:get,set:set,KEY:KEY,MODEL:MODEL};
+ window.__ro={get:get,set:set,KEY:KEY,MODEL:MODEL,discover:discover};
 })();
 </script>
 <script>
@@ -270,10 +279,16 @@ $('dp').onclick=async function(){try{var J=window.jspdf.jsPDF,d=new J({unit:'pt'
 async function save(n,b){if(!S.dl){$('status').innerHTML='<span class="err">Downloads need this page opened in claude.ai.</span>';return}await S.dl.save({filename:n,data:b})}
 function fail(e){if(e&&e.code==='declined')return;$('status').innerHTML='<span class="err">'+esc(e.message||e.code||'Download failed')+'</span>'}
 
-(function(){var R=window.__ro,gk=document.getElementById('gk'),gm=document.getElementById('gm'),st=document.getElementById('keyst'),box=document.getElementById('aiset');
+(function(){var R=window.__ro,gk=document.getElementById('gk'),gm=document.getElementById('gm'),gr=document.getElementById('gr'),gs=document.getElementById('gs'),st=document.getElementById('keyst'),box=document.getElementById('aiset');
  function show(){var has=!!R.get(R.KEY);st.textContent=has?'Key saved':'Key needed';st.className='pill '+(has?'ok':'wn');if(!has)box.open=true}
- gk.value=R.get(R.KEY);gm.value=R.get(R.MODEL)||'gemini-2.5-flash';show();
- gk.oninput=function(){R.set(R.KEY,gk.value.trim());show()};gm.onchange=function(){R.set(R.MODEL,gm.value)}})();
+ function fill(list){var cur=R.get(R.MODEL);if(/2\.5|1\.5|2\.0/.test(cur)){cur='';R.set(R.MODEL,'')}if(!list.length)return;
+  gm.innerHTML=list.map(function(m){return'<option value="'+m.id+'">'+m.id+'</option>'}).join('');
+  if(!cur||!list.some(function(m){return m.id===cur})){cur=list[0].id;R.set(R.MODEL,cur)}gm.value=cur}
+ async function load(){var k=R.get(R.KEY);if(!k){gs.textContent='';return}gs.textContent=' Loading models…';try{fill(await R.discover(k));gs.textContent=' Models loaded.'}catch(e){gs.textContent=' '+e.message}}
+ R.refresh=function(){var c=R.get(R.MODEL);if(c&&!Array.prototype.some.call(gm.options,function(o){return o.value===c})){var o=document.createElement('option');o.value=c;o.textContent=c;gm.appendChild(o)}gm.value=c};
+ gk.value=R.get(R.KEY);var m0=R.get(R.MODEL);if(/2\.5|1\.5|2\.0/.test(m0))R.set(R.MODEL,'');gm.value=R.get(R.MODEL)||'gemini-3.8-flash';show();
+ var t;gk.oninput=function(){R.set(R.KEY,gk.value.trim());show();clearTimeout(t);t=setTimeout(load,700)};
+ gm.onchange=function(){R.set(R.MODEL,gm.value)};gr.onclick=load;if(R.get(R.KEY))load()})();
 </script>
 </body>
 </html>
