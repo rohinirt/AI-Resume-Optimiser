@@ -67,19 +67,18 @@ table{border-collapse:collapse;width:100%;font-size:13px}td,th{border-bottom:1px
 .sk{height:84px;border-radius:14px;margin:10px 0;background:linear-gradient(90deg,var(--track),var(--panel),var(--track));background-size:200% 100%;animation:sh 1.2s linear infinite}@keyframes sh{to{background-position:-200% 0}}
 .stat{flex:1;min-width:110px}
 @media(prefers-reduced-motion:reduce){.chev{transition:none}.spin,.sk{animation:none}}
-#aiset .edit::before{content:"Change"}#aiset[open] .edit::before{content:"Collapse"}.nt{margin-top:6px}.nbtn{font-size:12px;font-weight:600;padding:3px 10px;border-radius:999px}.nflag{display:none;margin-left:6px}.nt.has .nflag{display:inline-flex}.nbox{margin-top:6px}.nbox textarea{height:64px;font:13px/1.4 Inter,system-ui,sans-serif}.nbox .mute{font-size:12px;margin-top:2px}</style>
+#aiset .edit::before{content:"Change"}#aiset[open] .edit::before{content:"Collapse"}.evd{margin-top:8px;padding:8px 10px;border-radius:8px;background:var(--okbg,rgba(16,150,100,.10));font-size:12.5px;line-height:1.45}.evd q{display:block;margin:3px 0;font-style:italic}.nt{margin-top:6px}.nbtn{font-size:12px;font-weight:600;padding:3px 10px;border-radius:999px}.nflag{display:none;margin-left:6px}.nt.has .nflag{display:inline-flex}.nbox{margin-top:6px}.nbox textarea{height:64px;font:13px/1.4 Inter,system-ui,sans-serif}.nbox .mute{font-size:12px;margin-top:2px}</style>
 </head>
 <body>
 <main>
 <section class="pane l">
   <div class="brand"><div class="logo">R</div><div><h1>Resume Optimiser</h1><div class="mute">Score against a job, then rewrite only from your own experience.</div></div></div>
   <details id="aiset" class="card inputs">
-    <summary><span class="sumt">AI settings</span><span id="keyst" class="pill"></span><span class="edit"></span></summary>
-    <div class="ig"><div class="in"><b><label for="gk">Gemini API key (free)</label></b>
-      <input id="gk" type="password" autocomplete="off" spellcheck="false" placeholder="Paste your key from aistudio.google.com/apikey" style="width:100%;margin-top:6px;border:1px solid var(--rule);border-radius:8px;padding:8px;font:13px ui-monospace,Consolas,monospace;background:var(--panel);color:var(--ink)">
-      <label for="gm" class="mute" style="display:block;margin-top:8px">Model</label>
+    <summary><span class="sumt">AI model</span><span id="keyst" class="pill"></span><span class="edit"></span></summary>
+    <div class="ig"><div class="in">
+      <label for="gm" class="mute" style="display:block">Model</label>
       <select id="gm" style="margin-top:4px;max-width:100%;border:1px solid var(--rule);border-radius:8px;padding:7px;background:var(--panel);color:var(--ink);font:inherit"><option value="gemini-3.8-flash">gemini-3.8-flash</option></select> <button id="gr" type="button" style="padding:6px 10px;font-size:13px">Refresh models</button><span id="gs" class="mute"></span>
-      <p class="mute" style="margin:8px 0 0">The key stays in this browser only. Your files are read in your browser and only their text is sent to Google's Gemini API.</p></div></div>
+      <p class="mute" style="margin:8px 0 0">Your files are read in your browser. Only their text is sent, through this site's own server, to Google's Gemini API. No API key is needed.</p></div></div>
   </details>
   <details id="inp" class="card inputs" open>
     <summary><span class="sumt">Inputs</span><span id="chips" class="row" style="gap:6px"></span><span class="edit"></span></summary>
@@ -105,33 +104,36 @@ table{border-collapse:collapse;width:100%;font-size:13px}td,th{border-bottom:1px
 /* Standalone shim: replaces the claude.ai-only helpers with the free Gemini API and a normal browser download. */
 (function(){
  var KEY='ro_gemini_key',MODEL='ro_gemini_model';
+ /* Set this to your Cloudflare Worker URL (no trailing slash). The Gemini key lives in the Worker, never in this page. */
+ var PROXY='https://YOUR-WORKER.YOUR-SUBDOMAIN.workers.dev';
  var get=function(k){try{return localStorage.getItem(k)||''}catch(e){return''}},set=function(k,v){try{localStorage.setItem(k,v)}catch(e){}};
  var sleep=function(ms){return new Promise(function(r){setTimeout(r,ms)})};
  function parse(t){t=String(t||'').replace(/^\s*```(?:json)?/i,'').replace(/```\s*$/,'').trim();try{return JSON.parse(t)}catch(e){var a=t.indexOf('{'),b=t.lastIndexOf('}');if(a>=0&&b>a)return JSON.parse(t.slice(a,b+1));throw Error('The AI reply was not valid JSON. Please try again.')}}
- var BASE='https://generativelanguage.googleapis.com/v1beta/';
- async function discover(k){var res=await fetch(BASE+'models?pageSize=200',{headers:{'x-goog-api-key':k}});if(!res.ok)throw Error('Could not list models ('+res.status+'). Check your API key.');
+ var BASE=(window.__proxyOverride||PROXY)+'/v1beta/';
+ async function discover(){var res;try{res=await fetch(BASE+'models?pageSize=200')}catch(e){throw Error('Could not reach the server.')}if(!res.ok)throw Error('Could not list models ('+res.status+').');
   var d=await res.json(),ver=function(n){var m=/gemini-(\d+(?:\.\d+)?)/.exec(n);return m?parseFloat(m[1]):0};
   return(d.models||[]).filter(function(m){var n=m.name||'';return(m.supportedGenerationMethods||[]).indexOf('generateContent')>=0&&/flash/.test(n)&&!/image|tts|live|audio|embed|robotics|computer|native/.test(n)})
    .map(function(m){return{id:m.name.replace(/^models\//,''),label:m.displayName||m.name}})
    .sort(function(a,b){return ver(b.id)-ver(a.id)||(/lite/.test(a.id)?1:0)-(/lite/.test(b.id)?1:0)||(/preview/.test(a.id)?1:0)-(/preview/.test(b.id)?1:0)})}
  async function json(prompt,opts){
-  var k=get(KEY);if(!k)throw Error('Add your free Gemini API key under "AI settings" first.');
+  if(/YOUR-WORKER/.test(BASE))throw Error('The site owner has not set the server address yet.');
   var model=get(MODEL)||'gemini-3.8-flash',url;
   var body=JSON.stringify({contents:[{role:'user',parts:[{text:prompt}]}],generationConfig:{responseMimeType:'application/json',temperature:0.2}});
   var last='';
   var healed=false;
   for(var a=0;a<4;a++){
-   url=BASE+'models/'+model+':generateContent';var res;try{res=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':k},body:body})}catch(e){throw Error('Could not reach the Gemini API. Check your internet connection.')}
+   url=BASE+'models/'+model+':generateContent';var res;try{res=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:body})}catch(e){throw Error('Could not reach the server. Check your internet connection.')}
    if(res.ok){var d=await res.json(),c=(d.candidates||[])[0],parts=(c&&c.content&&c.content.parts)||[],text=parts.map(function(p){return p.text||''}).join('');
     if(!text)throw Error('The AI returned an empty reply'+(c&&c.finishReason?' ('+c.finishReason+')':'')+'. Please try again.');
     if(opts&&opts.onText)opts.onText({text:text});return parse(text)}
    var msg='';try{msg=((await res.json()).error||{}).message||''}catch(e){}last=res.status+(msg?': '+msg:'');
-   if(res.status===404&&!healed){healed=true;try{var L=await discover(k);if(L.length&&L[0].id!==model){model=L[0].id;set(MODEL,model);if(window.__ro.refresh)window.__ro.refresh();a--;continue}}catch(e){}}
-   if(res.status===404)throw Error('This Gemini model is not available to your key ('+last+'). Pick another model under AI settings.');
-   if(res.status===400||res.status===401||res.status===403)throw Error('Gemini rejected the request ('+last+'). Check that your API key is correct.');
+   if(res.status===404&&!healed){healed=true;try{var L=await discover();if(L.length&&L[0].id!==model){model=L[0].id;set(MODEL,model);if(window.__ro.refresh)window.__ro.refresh();a--;continue}}catch(e){}}
+   if(res.status===404)throw Error('This Gemini model is not available ('+last+'). Pick another model under AI model.');
+   if(res.status===401||res.status===403)throw Error('The server refused the request ('+last+'). The site owner needs to check the server setup.');
+   if(res.status===400)throw Error('Gemini rejected the request ('+last+').');
    if(res.status===429||res.status>=500){await sleep(4000*(a+1));continue}
    throw Error('Gemini error '+last)}
-  if(/^429/.test(last))throw Error('Free-tier limit reached. Wait a minute and try again, or switch the model to Flash-Lite under AI settings.');
+  if(/^429/.test(last))throw Error('Free-tier limit reached. Wait a minute and try again, or switch the model to Flash-Lite under AI model.');
   throw Error('Gemini is busy right now ('+last+'). Please try again.')}
  var dl={save:async function(o){var u=URL.createObjectURL(o.data),a=document.createElement('a');a.href=u;a.download=o.filename;document.body.appendChild(a);a.click();a.remove();setTimeout(function(){URL.revokeObjectURL(u)},4000)}};
  window.claude={use:async function(n){if(n==='sample')return{json:json};if(n==='downloads')return dl;throw Error('Unknown helper '+n)}};
@@ -344,8 +346,20 @@ $('bs').onclick=async function(){if(!need())return;$('bs').disabled=true;$('br')
  try{S.an=null;S.engineErr='';if(window.ENGINE){try{ENGINE.reset();S.an=await ENGINE.analyse(resumeText(),$('jd').value,ask,function(m){$('status').textContent=m})}catch(e){S.engineErr=e.message||'engine failed';S.an=null;$('status').textContent='Scoring engine unavailable, using an AI estimate instead…'}}
  if(!S.an)S.an=await ask('You are an ATS analyst modelled on Workday-style screening. Compare the RESUME with the JOB DESCRIPTION. Return ONLY JSON, no markdown:\n{"role":"JD title","aligned":"strong|moderate|weak","alignment_note":"1-2 sentences","blockers":["hard blockers if any"],"factors":{"skills":F,"title":F,"hard":F,"narr":F}}\nwhere F={"score":0-100,"reason":"2 sentences on why this score","items":[{"label":"short","status":"match|partial|missing","where":"quote of 12 words max from the resume proving it, or empty","note":"one sentence on why it affects the score"}]} with 6-12 items per factor.\nskills: JD required/preferred skills, tools, methods. title: title, seniority and domain fit. hard: years of experience, degree, certifications, location and anything mandatory. narr: JD duties versus the scope, scale and outcomes the resume bullets show. Be strict and consistent.\nRESUME:\n'+resumeText()+'\nJOB DESCRIPTION:\n'+$('jd').value,'Analysing');
   if(S.engineErr&&S.an&&!S.an.engine)S.an.engine='AI estimate only. The scoring engine could not run ('+S.engineErr+').';
+  S.ev={};S.evSig='';try{await scanEvidence()}catch(e){S.ev={};S.evSig=''}
   $('status').textContent='';renderAn();$('br').disabled=false;$('br').textContent=S.an.aligned==='weak'?'Rewrite anyway':'Rewrite my resume'}
  catch(e){$('an').innerHTML='';$('t-res').innerHTML=EMPTY;$('status').innerHTML='<span class="err">'+esc(e.message||e.code||'Failed')+'</span>'}$('bs').disabled=false;if(S.an)$('t-res').innerHTML='<div class="empty"><b>Analysis ready</b><p class="mute">Select “'+$('br').textContent+'” to generate your updated sections.</p></div>'};
+S.ev={};S.evSig='';
+function extraText(){return($('up').value.trim()?'EXTRA EXPERIENCE:\n'+$('up').value.trim()+'\n':'')+($('pj').value.trim()?'PROJECTS FILE:\n'+$('pj').value.trim()+'\n':'')}
+function gapItems(){var o=[];['skills','narr'].forEach(function(k){var f=S.an&&S.an.factors&&S.an.factors[k];((f&&f.items)||[]).forEach(function(i){if(i.status!=='match')o.push({k:k,label:String(i.label||'').replace(/ \(preferred\)$/,''),note:i.note||''})})});return o}
+async function scanEvidence(){var x=extraText(),sig=x+'|'+(S.an&&S.an.role||'');if(!x||!S.an||sig===S.evSig)return;var g=gapItems();if(!g.length){S.evSig=sig;return}
+ var r=await ask('You check whether a person\'s extra experience files truthfully support skills or duties that their resume does not show. Return ONLY JSON, no markdown.\nFor each GAP below, search the EXTRA FILES. Set "found" to true only if the files show that skill, tool or duty, or a close real equivalent (for example Gemini or Cursor are evidence of Gen AI use; building dashboards is evidence of data visualisation). Never stretch: if the files do not show it, found is false. When found, give "evidence" (a quote of at most 25 words copied from the files), "where" (the job or project it comes from), and "plan" (one or two sentences: which resume section or role should carry it and how to word it, using the JD term). Do not invent numbers or tools.\nSchema: {"items":[{"label":"exact GAP label","found":true,"evidence":"","where":"","plan":""}]}\nGAPS:\n'+g.map(function(i){return '- '+i.label+(i.note?' ('+i.note+')':'')}).join('\n')+'\nRESUME:\n'+resumeText()+'\nEXTRA FILES:\n'+x+'\nJOB DESCRIPTION:\n'+$('jd').value,'Looking for evidence in your experience files');
+ S.ev={};(r.items||[]).forEach(function(i){if(i&&i.label)S.ev[norm(i.label)]=i});S.evSig=sig}
+function evUI(i,st){if(st==='match'||!S.evSig)return'';var e=S.ev[norm(String(i.label).replace(/ \(preferred\)$/,''))];
+ if(!e||!e.found)return '<div class="mute" style="font-size:12px;margin-top:6px">Not found in your extra files either.</div>';
+ return '<div class="evd"><b>Found in your experience'+(e.where?' ('+esc(e.where)+')':'')+'</b>'+(e.evidence?'<q>“'+esc(e.evidence)+'”</q>':'')+'<div><i>Rewrite plan:</i> '+esc(e.plan||'')+'</div></div>'}
+function evText(){var o=[];Object.keys(S.ev).forEach(function(k){var e=S.ev[k];if(e&&e.found)o.push('- '+e.label+': evidence "'+(e.evidence||'')+'" ('+(e.where||'extra files')+'). Plan: '+(e.plan||''))});
+ return o.length?'\nEVIDENCE FOUND IN THE EXTRA FILES. These gaps in the resume are supported by the extra files. Add each one to the resume as planned, using the exact JD wording, in the most relevant role, project, the summary or the skills line. Rewrite or replace a weaker bullet, or add one under the BULLET COUNT limits. Put "experience file" in changes[].source for these. Only use what the evidence shows.\n'+o.join('\n'):''}
 function noteUI(k,i,st){if((k!=='skills'&&k!=='narr')||st==='match')return'';var key=k+'|'+norm(i.label),v=S.notes[key]||'';S.noteLabels[key]=String(i.label).replace(/ \(preferred\)$/,'');
  return '<div class="nt'+(v?' has':'')+'"><button type="button" class="nbtn" data-k="'+esc(key)+'">'+(v?'Edit my note':'I have this')+'</button><span class="pill ok nflag">Note added</span><div class="nbox"'+(v?'':' hidden')+'><textarea data-k="'+esc(key)+'" placeholder="How did you use this? Describe the work, the tools and the result in your own words, and say where it fits on your resume (for example, under which job).">'+esc(v)+'</textarea><div class="mute">Used in the rewrite as true evidence. Nothing is added beyond what you write.</div></div></div>'}
 function updNoteCount(){var c=Object.keys(S.notes).filter(function(k){return S.notes[k]}).length;$('notecount').textContent=c?c+' note'+(c>1?'s':'')+' will be used in the rewrite.':''}
@@ -357,7 +371,7 @@ function renderAn(){var wasOpen=[].map.call(document.querySelectorAll('#an detai
  h+='<h2>Score breakdown</h2>'+(a.engine?'<div class="mute" style="margin:-4px 0 10px;font-size:12px">'+esc(a.engine)+'</div>':'');
  Object.keys(WT).forEach(function(k){var f=a.factors[k],it=f.items||[],g={match:[],partial:[],missing:[]};it.forEach(function(i){(g[i.status]||g.missing).push(i)});var v=af?Math.round(af[k]):sc[k];
   h+='<details class="card fac"><summary>'+ring(v)+'<div><h3>'+FN[k]+'<span class="pill ac">'+WT[k]*100+'% weight</span>'+(af?'<span class="pill">was '+sc[k]+'</span>':'')+'</h3><div class="rs">'+esc(f.reason)+'</div><div class="row" style="gap:6px"><span class="pill ok">'+g.match.length+' matched</span><span class="pill wn">'+g.partial.length+' partial</span><span class="pill bd">'+g.missing.length+' missing</span></div></div><svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg></summary><div class="fb">';
-  [['missing','Missing','bad'],['partial','Partial','warn'],['match','Matched','ok']].forEach(function(s){if(!g[s[0]].length)return;h+='<div class="grp" style="color:var(--'+s[2]+')">'+s[1]+'</div>'+g[s[0]].map(function(i){return '<div class="it '+s[0]+'"><b>'+esc(i.label)+'</b>'+(i.where?' <q>“'+esc(i.where)+'”</q>':'')+'<div class="mute">'+esc(i.note)+'</div>'+noteUI(k,i,s[0])+'</div>'}).join('')});
+  [['missing','Missing','bad'],['partial','Partial','warn'],['match','Matched','ok']].forEach(function(s){if(!g[s[0]].length)return;h+='<div class="grp" style="color:var(--'+s[2]+')">'+s[1]+'</div>'+g[s[0]].map(function(i){return '<div class="it '+s[0]+'"><b>'+esc(i.label)+'</b>'+(i.where?' <q>“'+esc(i.where)+'”</q>':'')+'<div class="mute">'+esc(i.note)+'</div>'+((k==='skills'||k==='narr')?evUI(i,s[0]):'')+noteUI(k,i,s[0])+'</div>'}).join('')});
   h+='</div></details>'});
  if(S.rw&&(S.rw.remaining_gaps||[]).length)h+='<h2>Still missing after rewrite</h2><div class="row" style="gap:6px">'+S.rw.remaining_gaps.map(function(g){return '<span class="pill wn">'+esc(g)+'</span>'}).join('')+'</div>';
  $('an').innerHTML=h;[].forEach.call(document.querySelectorAll('#an details.fac'),function(d,i){if(wasOpen[i])d.open=true});updNoteCount()}
@@ -372,16 +386,16 @@ function targetsText(){if(!S.an||!S.an.factors||!S.an.factors.skills)return'';
  if(!keep.length&&!add.length)return'';
  return `\nATS TARGETS (measured on the current resume). KEEP, already matched, must stay in the final text: ${keep.join(', ')||'none'}. ADD IF TRUE, missing or only partly matched: ${add.join(', ')||'none'}. For each ADD term, search the EXTRA EXPERIENCE, the PROJECTS FILE and the USER NOTES. If a source truthfully shows that skill or a close equivalent, use the exact JD wording for it in the summary, a bullet, a project line or the skills line. A term that has a USER NOTE counts as shown. If no source shows it, do not add it and list it in remaining_gaps. The skills section has no length limit: list every KEEP term and every supported ADD term there, exactly as the JD spells it.`}
 function notesText(){var o=[];Object.keys(S.notes).forEach(function(k){var v=(S.notes[k]||'').trim();if(v)o.push('- '+(S.noteLabels[k]||k.split('|')[1])+': '+v)});
- return o.length?`\nUSER NOTES. The user confirms these are true and explains how they did the work and how to show it on the resume. Treat each note as real evidence, equal to the resume. For each one, work it into the most relevant role or project, the summary or the skills line, using the user's own details and the exact JD wording for the skill. Do not add numbers, tools or claims the note does not give. A note never allows more bullets than the resume has: replace or merge weaker bullets instead. Put "user note" in changes[].source for anything that comes from a note.\n${o.join('\n')}`:''}
+ return o.length?`\nUSER NOTES. The user confirms these are true and explains how they did the work and how to show it on the resume. Treat each note as real evidence, equal to the resume. For each one, work it into the most relevant role or project, the summary or the skills line, using the user's own details and the exact JD wording for the skill. Do not add numbers, tools or claims the note does not give. If a note needs its own bullet, you may add one under the BULLET COUNT limits; otherwise replace or merge a weaker bullet. Put "user note" in changes[].source for anything that comes from a note.\n${o.join('\n')}`:''}
 function rwPrompt(fb){var pf=hasProjFile();
  return `You edit a resume to fit a job description without inventing anything. Return ONLY JSON, no markdown.
 ${RULES}
 BULLET QUALITY: Start each bullet with a strong, specific verb (Built, Automated, Reduced, Designed, Led, Streamlined, Analysed, Delivered). Never start with "Responsible for", "Worked on", "Helped", "Assisted" or "Involved in". Structure: strong verb + what you did + how (tools or method) + result. The result must be concrete: use a verified number from the sources where one exists; otherwise state the real outcome in plain words (what changed, who benefited, what got faster or simpler). Never invent a figure. Do not use the same opening verb twice across the whole resume. Before answering, check every bullet against these rules and fix any that fail.
 BULLET EDITING: review every existing bullet against the JD. For each, decide KEEP (already strong), REWRITE (same fact, better wording and keywords), REMOVE (irrelevant or weak for this JD) or REORDER. A new bullet may only replace a removed one, and only when the sources support a JD-relevant achievement that is not on the resume yet.
-BULLET COUNT: never write more bullets for a role than the resume already has for it. You may write fewer when bullets are weak or irrelevant to this job, but keep at least 3 per role (or all of them if the role has fewer). Replace or merge weaker bullets instead of adding. Keep every role of the resume, in its original order.
+BULLET COUNT: by default keep the same number of bullets per role as the resume. You may add bullets (at most 2 extra per role, and never more than 6 in one role) only when the sources show a real achievement that the JD asks for and that no existing bullet covers, or when a USER NOTE needs its own bullet. Prefer replacing a weak bullet over adding. You may write fewer when bullets are weak or irrelevant, but keep at least 3 per role (or all of them if the role has fewer). Mark each added bullet with action "add". Keep every role of the resume, in its original order.
 ORDER: inside every role and every project, order the bullets for THIS job: the strongest evidence of the JD's top requirements first, then the highest measurable impact, then the rest. Say why in "order_reason" (one sentence). For each moved bullet, fill "order" in its change entry (for example "was bullet 3, now bullet 1").
 SUMMARY: 40-60 words, written for this job. If the resume has no summary section, set layout.summary to null and summary to "".
-PROJECTS: ${pf?'choose the 2 projects, from the PROJECTS FILE and the resume itself, that fit this job best, 1-2 bullets each, most relevant first.':'use only the projects already on the resume, at most as many as it has (never more than 2), 1-2 bullets each, most relevant first.'} For each project give "tools" (the tools and languages named on its title line or in its description) and "link" (the exact URL in parentheses after "Link" or "GitHub" on its title line, empty string if none). Never invent a URL or a tool. If the resume has no projects section, set layout.projects to null and projects to [].${targetsText()}${notesText()}
+PROJECTS: ${pf?'choose the 2 projects, from the PROJECTS FILE and the resume itself, that fit this job best, 1-2 bullets each, most relevant first.':'use only the projects already on the resume, at most as many as it has (never more than 2), 1-2 bullets each, most relevant first.'} For each project give "tools" (the tools and languages named on its title line or in its description) and "link" (the exact URL in parentheses after "Link" or "GitHub" on its title line, empty string if none). Never invent a URL or a tool. If the resume has no projects section, set layout.projects to null and projects to [].${targetsText()}${evText()}${notesText()}
 KEYWORD SAFETY: every JD keyword, skill or tool that the current RESUME already contains must still appear in your final text (summary, a bullet, a project line or the skills line). Never drop one to save space. Rewriting must not lower the match.
 LAYOUT: The RESUME is given as "index| text" paragraphs. Give paragraph indexes so the new text can replace the old. For every job or experience entry on the resume (any employer, in resume order) add one object to "roles" with "company", "title", "paras" (the indexes of that entry's bullet paragraphs only: not the section heading, not the line with company, title and dates) and "tpl" (the index of one of those bullet paragraphs, whose formatting is reused). For projects give "titleTpl", "bulletTpl", "paras" (title lines and bullets) and "count" (how many projects the resume has). For summary and skills give "tpl" and "paras" (body only, not the heading). Use null for a section that does not exist. Never use the same paragraph index twice.
 Schema:
@@ -395,18 +409,19 @@ PROJECTS FILE (optional):
 ${$('pj').value.trim()||'(none)'}
 JOB DESCRIPTION:
 ${$('jd').value}`}
+function capB(o){return Math.max(o,Math.min(o+2,6))}
 function limits(r){var p=[],n=function(a){return(a||[]).length},L=r.layout||{},used={},bad=false;
  if(L.summary){var w=wc(r.summary);if(w<40||w>60)p.push('summary is '+w+' words, must be 40-60')}
  var chk=function(a){(a||[]).forEach(function(i){if(typeof i!=='number'||i<0||i>=S.paras.length||used[i])bad=true;used[i]=1})};
  chk((L.summary||{}).paras);chk((L.skills||{}).paras);chk((L.projects||{}).paras);
  (r.roles||[]).forEach(function(ro,i){chk(ro.paras);var o=n(ro.paras),b=n(ro.bullets),nm=ro.company||ro.title||('role '+(i+1));
-  if(o&&b>o)p.push(nm+' has '+b+' bullets but the resume has '+o+', never increase');else if(o&&b<Math.min(3,o))p.push(nm+' has '+b+' bullets, keep at least '+Math.min(3,o))});
+  if(o&&b>capB(o))p.push(nm+' has '+b+' bullets but the resume has '+o+'; at most '+capB(o)+' are allowed');else if(o&&b<Math.min(3,o))p.push(nm+' has '+b+' bullets, keep at least '+Math.min(3,o))});
  if(bad)p.push('layout paragraph indexes are out of range or used twice');
  var mp=maxProj(r);if(L.projects){if(n(r.projects)>mp)p.push('at most '+mp+' project'+(mp===1?'':'s'));if(!n(r.projects))p.push('keep at least 1 project');(r.projects||[]).forEach(function(x){if(n(x.bullets)<1||n(x.bullets)>2)p.push('project '+x.name+' has '+n(x.bullets)+' bullets, must be 1-2')})}
  return p}
 $('br').onclick=async function(){if(!need())return;
- $('br').disabled=true;$('bs').disabled=true;resetOut('Rewriting your resume',true);if(S.an)renderAn();
- try{var r=await ask(rwPrompt(''),'Rewriting'),pr=limits(r);if(pr.length){r=await ask(rwPrompt(pr.join('; ')),'Fixing section limits');pr=limits(r)}
+  $('br').disabled=true;$('bs').disabled=true;resetOut('Rewriting your resume',true);if(S.an)renderAn();
+ try{try{await scanEvidence();renderAn()}catch(e){}var r=await ask(rwPrompt(''),'Rewriting'),pr=limits(r);if(pr.length){r=await ask(rwPrompt(pr.join('; ')),'Fixing section limits');pr=limits(r)}
   S.limitProblems=pr;var eng=!!(window.ENGINE&&S.an&&S.an.engine&&S.an.engine.indexOf('Scoring engine')===0);
   var measure=async function(x){await loadResume();apply(x);if(eng){$('status').textContent='Re-scoring the updated resume…';try{await ENGINE.after(x,liveText())}catch(e){eng=false}}};
   await measure(r);
@@ -461,7 +476,7 @@ function unverified(){var src=(S.origText||'')+' '+$('up').value+' '+$('pj').val
  txt.join(' ').replace(/\d[\d,]*(?:\.\d+)?\s?(?:%|\+)?/g,function(m){m=m.trim();if(m&&src.indexOf(m)<0)bad[m]=1});return Object.keys(bad)}
 function renderAll(){var r=S.rw,L=r.layout||{},u=unverified(),lp=S.limitProblems||[],m={},n=function(a){return(a||[]).length};(r.changes||[]).forEach(function(c){if(c.after)m[norm(c.after)]=c});
  var secs=function(p){return(r.changes||[]).filter(function(c){var s=norm(c.section);return p.some(function(x){return s.indexOf(x)===0})})};
- var top='<div class="row" style="gap:6px;margin-bottom:10px">'+(L.summary?chip('Summary '+wc(r.summary)+' words',wc(r.summary)>=40&&wc(r.summary)<=60):'')+(r.roles||[]).map(function(ro){var o=n(ro.paras);return chip((ro.company||ro.title||'Role')+': '+n(ro.bullets)+' of '+o+' bullets',n(ro.bullets)<=o&&n(ro.bullets)>=Math.min(3,o))}).join('')+(L.projects?chip(n(r.projects)+' project'+(n(r.projects)===1?'':'s'),n(r.projects)<=maxProj(r)):'')+(u.length?'':'<span class="pill ok">All numbers match your sources</span>')+'<label class="mute" style="margin-left:auto"><input type="checkbox" id="rz" '+(S.reason?'checked':'')+'> Show reasoning</label></div>';
+ var top='<div class="row" style="gap:6px;margin-bottom:10px">'+(L.summary?chip('Summary '+wc(r.summary)+' words',wc(r.summary)>=40&&wc(r.summary)<=60):'')+(r.roles||[]).map(function(ro){var o=n(ro.paras);return chip((ro.company||ro.title||'Role')+': '+n(ro.bullets)+' of '+o+' bullets',n(ro.bullets)<=capB(o)&&n(ro.bullets)>=Math.min(3,o))}).join('')+(L.projects?chip(n(r.projects)+' project'+(n(r.projects)===1?'':'s'),n(r.projects)<=maxProj(r)):'')+(u.length?'':'<span class="pill ok">All numbers match your sources</span>')+'<label class="mute" style="margin-left:auto"><input type="checkbox" id="rz" '+(S.reason?'checked':'')+'> Show reasoning</label></div>';
  if(r.after_scores&&S.an){var _b={};Object.keys(WT).forEach(function(k){_b[k]=Math.round(+S.an.factors[k].score||0)});if(overall(r.after_scores)<overall(_b))top+='<div class="verdict bad"><b>This rewrite scores lower than your original ('+overall(r.after_scores)+'% against '+overall(_b)+'%).</b> Do not use it as it is. Select Rewrite again, or keep your original wording for the sections that lost keywords.</div>'}
  if((r.lost_keywords||[]).length)top+='<div class="verdict warn"><b>Keywords the rewrite dropped</b><div>These matched your original resume but are missing now: '+r.lost_keywords.map(function(x){return '<span class="pill wn">'+esc(x)+'</span>'}).join(' ')+' Add them back by hand only if they are true.</div></div>';
  if(lp.length)top+='<div class="verdict bad">Limits not met: '+esc(lp.join('; '))+'</div>';
@@ -494,16 +509,15 @@ function fileBase(){var m=(S.rw&&S.rw.meta)||{},parts=[clean(m.name||guessName()
 async function save(n,b){if(!S.dl){$('status').innerHTML='<span class="err">Downloads need this page opened in claude.ai.</span>';return}await S.dl.save({filename:n,data:b})}
 function fail(e){if(e&&e.code==='declined')return;$('status').innerHTML='<span class="err">'+esc(e.message||e.code||'Download failed')+'</span>'}
 
-(function(){var R=window.__ro,gk=document.getElementById('gk'),gm=document.getElementById('gm'),gr=document.getElementById('gr'),gs=document.getElementById('gs'),st=document.getElementById('keyst'),box=document.getElementById('aiset');
- function show(){var has=!!R.get(R.KEY);st.textContent=has?'Key saved':'Key needed';st.className='pill '+(has?'ok':'wn');if(!has)box.open=true}
+(function(){var R=window.__ro,gm=document.getElementById('gm'),gr=document.getElementById('gr'),gs=document.getElementById('gs'),st=document.getElementById('keyst');
+ st.textContent='Ready';st.className='pill ok';
  function fill(list){var cur=R.get(R.MODEL);if(/2\.5|1\.5|2\.0/.test(cur)){cur='';R.set(R.MODEL,'')}if(!list.length)return;
   gm.innerHTML=list.map(function(m){return'<option value="'+m.id+'">'+m.id+'</option>'}).join('');
   if(!cur||!list.some(function(m){return m.id===cur})){cur=list[0].id;R.set(R.MODEL,cur)}gm.value=cur}
- async function load(){var k=R.get(R.KEY);if(!k){gs.textContent='';return}gs.textContent=' Loading models…';try{fill(await R.discover(k));gs.textContent=' Models loaded.'}catch(e){gs.textContent=' '+e.message}}
+ async function load(){gs.textContent=' Loading models…';try{fill(await R.discover());gs.textContent=' Models loaded.'}catch(e){gs.textContent=' '+e.message}}
  R.refresh=function(){var c=R.get(R.MODEL);if(c&&!Array.prototype.some.call(gm.options,function(o){return o.value===c})){var o=document.createElement('option');o.value=c;o.textContent=c;gm.appendChild(o)}gm.value=c};
- gk.value=R.get(R.KEY);var m0=R.get(R.MODEL);if(/2\.5|1\.5|2\.0/.test(m0))R.set(R.MODEL,'');gm.value=R.get(R.MODEL)||'gemini-3.8-flash';show();
- var t;gk.oninput=function(){R.set(R.KEY,gk.value.trim());show();clearTimeout(t);t=setTimeout(load,700)};
- gm.onchange=function(){R.set(R.MODEL,gm.value)};gr.onclick=load;if(R.get(R.KEY))load()})();
+ var m0=R.get(R.MODEL);if(/2\.5|1\.5|2\.0/.test(m0))R.set(R.MODEL,'');gm.value=R.get(R.MODEL)||'gemini-3.8-flash';
+ gm.onchange=function(){R.set(R.MODEL,gm.value)};gr.onclick=load;load()})();
 </script>
 </body>
 </html>
