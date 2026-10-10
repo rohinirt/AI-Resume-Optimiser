@@ -74,11 +74,13 @@ table{border-collapse:collapse;width:100%;font-size:13px}td,th{border-bottom:1px
 <section class="pane l">
   <div class="brand"><div class="logo">R</div><div><h1>Resume Optimiser</h1><div class="mute">Score against a job, then rewrite only from your own experience.</div></div></div>
   <details id="aiset" class="card inputs">
-    <summary><span class="sumt">AI model</span><span id="keyst" class="pill"></span><span class="edit"></span></summary>
+    <summary><span class="sumt">AI settings</span><span id="keyst" class="pill"></span><span class="edit"></span></summary>
     <div class="ig"><div class="in">
+      <div id="keybox"><b><label for="gk">Gemini API key (free)</label></b>
+      <input id="gk" type="password" autocomplete="off" spellcheck="false" placeholder="Paste your key from aistudio.google.com/apikey" style="width:100%;margin:6px 0 8px;border:1px solid var(--rule);border-radius:8px;padding:8px;font:13px ui-monospace,Consolas,monospace;background:var(--panel);color:var(--ink)"></div>
       <label for="gm" class="mute" style="display:block">Model</label>
       <select id="gm" style="margin-top:4px;max-width:100%;border:1px solid var(--rule);border-radius:8px;padding:7px;background:var(--panel);color:var(--ink);font:inherit"><option value="gemini-3.8-flash">gemini-3.8-flash</option></select> <button id="gr" type="button" style="padding:6px 10px;font-size:13px">Refresh models</button><span id="gs" class="mute"></span>
-      <p class="mute" style="margin:8px 0 0">Your files are read in your browser. Only their text is sent, through this site's own server, to Google's Gemini API. No API key is needed.</p></div></div>
+      <p class="mute" style="margin:8px 0 0">The key stays in this browser only. Your files are read in your browser and only their text is sent to Google's Gemini API.</p></div></div>
   </details>
   <details id="inp" class="card inputs" open>
     <summary><span class="sumt">Inputs</span><span id="chips" class="row" style="gap:6px"></span><span class="edit"></span></summary>
@@ -109,35 +111,36 @@ table{border-collapse:collapse;width:100%;font-size:13px}td,th{border-bottom:1px
  var get=function(k){try{return localStorage.getItem(k)||''}catch(e){return''}},set=function(k,v){try{localStorage.setItem(k,v)}catch(e){}};
  var sleep=function(ms){return new Promise(function(r){setTimeout(r,ms)})};
  function parse(t){t=String(t||'').replace(/^\s*```(?:json)?/i,'').replace(/```\s*$/,'').trim();try{return JSON.parse(t)}catch(e){var a=t.indexOf('{'),b=t.lastIndexOf('}');if(a>=0&&b>a)return JSON.parse(t.slice(a,b+1));throw Error('The AI reply was not valid JSON. Please try again.')}}
- var BASE=(window.__proxyOverride||PROXY)+'/v1beta/';
- async function discover(){var res;try{res=await fetch(BASE+'models?pageSize=200')}catch(e){throw Error('Could not reach the server.')}if(!res.ok)throw Error('Could not list models ('+res.status+').');
+ var useProxy=!!window.__proxyOverride||!/YOUR-WORKER/.test(PROXY);
+ var BASE=useProxy?(window.__proxyOverride||PROXY)+'/v1beta/':'https://generativelanguage.googleapis.com/v1beta/';
+ var kh=function(h){var k=get(KEY);if(!useProxy&&k)h['x-goog-api-key']=k;return h};
+ async function discover(){var res;try{if(!useProxy&&!get(KEY))throw Error('Add your Gemini API key first.');res=await fetch(BASE+'models?pageSize=200',{headers:kh({})})}catch(e){if(/Add your/.test(e.message))throw e;throw Error('Could not reach the server.')}if(!res.ok)throw Error('Could not list models ('+res.status+')'+(useProxy?'.':'. Check your API key.'))
   var d=await res.json(),ver=function(n){var m=/gemini-(\d+(?:\.\d+)?)/.exec(n);return m?parseFloat(m[1]):0};
   return(d.models||[]).filter(function(m){var n=m.name||'';return(m.supportedGenerationMethods||[]).indexOf('generateContent')>=0&&/flash/.test(n)&&!/image|tts|live|audio|embed|robotics|computer|native/.test(n)})
    .map(function(m){return{id:m.name.replace(/^models\//,''),label:m.displayName||m.name}})
    .sort(function(a,b){return ver(b.id)-ver(a.id)||(/lite/.test(a.id)?1:0)-(/lite/.test(b.id)?1:0)||(/preview/.test(a.id)?1:0)-(/preview/.test(b.id)?1:0)})}
  async function json(prompt,opts){
-  if(/YOUR-WORKER/.test(BASE))throw Error('The site owner has not set the server address yet.');
+  if(!useProxy&&!get(KEY))throw Error('Add your free Gemini API key under "AI settings" first.');
   var model=get(MODEL)||'gemini-3.8-flash',url;
   var body=JSON.stringify({contents:[{role:'user',parts:[{text:prompt}]}],generationConfig:{responseMimeType:'application/json',temperature:0.2}});
   var last='';
   var healed=false;
   for(var a=0;a<4;a++){
-   url=BASE+'models/'+model+':generateContent';var res;try{res=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:body})}catch(e){throw Error('Could not reach the server. Check your internet connection.')}
+   url=BASE+'models/'+model+':generateContent';var res;try{res=await fetch(url,{method:'POST',headers:kh({'Content-Type':'application/json'}),body:body})}catch(e){throw Error('Could not reach the Gemini API. Check your internet connection.')}
    if(res.ok){var d=await res.json(),c=(d.candidates||[])[0],parts=(c&&c.content&&c.content.parts)||[],text=parts.map(function(p){return p.text||''}).join('');
     if(!text)throw Error('The AI returned an empty reply'+(c&&c.finishReason?' ('+c.finishReason+')':'')+'. Please try again.');
     if(opts&&opts.onText)opts.onText({text:text});return parse(text)}
    var msg='';try{msg=((await res.json()).error||{}).message||''}catch(e){}last=res.status+(msg?': '+msg:'');
    if(res.status===404&&!healed){healed=true;try{var L=await discover();if(L.length&&L[0].id!==model){model=L[0].id;set(MODEL,model);if(window.__ro.refresh)window.__ro.refresh();a--;continue}}catch(e){}}
    if(res.status===404)throw Error('This Gemini model is not available ('+last+'). Pick another model under AI model.');
-   if(res.status===401||res.status===403)throw Error('The server refused the request ('+last+'). The site owner needs to check the server setup.');
-   if(res.status===400)throw Error('Gemini rejected the request ('+last+').');
+   if(res.status===400||res.status===401||res.status===403)throw Error('Gemini rejected the request ('+last+').'+(useProxy?' The site owner needs to check the server setup.':' Check that your API key is correct.'));
    if(res.status===429||res.status>=500){await sleep(4000*(a+1));continue}
    throw Error('Gemini error '+last)}
   if(/^429/.test(last))throw Error('Free-tier limit reached. Wait a minute and try again, or switch the model to Flash-Lite under AI model.');
   throw Error('Gemini is busy right now ('+last+'). Please try again.')}
  var dl={save:async function(o){var u=URL.createObjectURL(o.data),a=document.createElement('a');a.href=u;a.download=o.filename;document.body.appendChild(a);a.click();a.remove();setTimeout(function(){URL.revokeObjectURL(u)},4000)}};
  window.claude={use:async function(n){if(n==='sample')return{json:json};if(n==='downloads')return dl;throw Error('Unknown helper '+n)}};
- window.__ro={get:get,set:set,KEY:KEY,MODEL:MODEL,discover:discover};
+ window.__ro={get:get,set:set,KEY:KEY,MODEL:MODEL,discover:discover,useProxy:useProxy};
 })();
 </script>
 <script>
@@ -509,14 +512,15 @@ function fileBase(){var m=(S.rw&&S.rw.meta)||{},parts=[clean(m.name||guessName()
 async function save(n,b){if(!S.dl){$('status').innerHTML='<span class="err">Downloads need this page opened in claude.ai.</span>';return}await S.dl.save({filename:n,data:b})}
 function fail(e){if(e&&e.code==='declined')return;$('status').innerHTML='<span class="err">'+esc(e.message||e.code||'Download failed')+'</span>'}
 
-(function(){var R=window.__ro,gm=document.getElementById('gm'),gr=document.getElementById('gr'),gs=document.getElementById('gs'),st=document.getElementById('keyst');
- st.textContent='Ready';st.className='pill ok';
+(function(){var R=window.__ro,gk=document.getElementById('gk'),gm=document.getElementById('gm'),gr=document.getElementById('gr'),gs=document.getElementById('gs'),st=document.getElementById('keyst'),box=document.getElementById('aiset'),kb=document.getElementById('keybox');
+ function show(){if(R.useProxy){st.textContent='Ready';st.className='pill ok';kb.hidden=true;return}var has=!!R.get(R.KEY);st.textContent=has?'Key saved':'Key needed';st.className='pill '+(has?'ok':'wn');if(!has)box.open=true}
  function fill(list){var cur=R.get(R.MODEL);if(/2\.5|1\.5|2\.0/.test(cur)){cur='';R.set(R.MODEL,'')}if(!list.length)return;
   gm.innerHTML=list.map(function(m){return'<option value="'+m.id+'">'+m.id+'</option>'}).join('');
   if(!cur||!list.some(function(m){return m.id===cur})){cur=list[0].id;R.set(R.MODEL,cur)}gm.value=cur}
- async function load(){gs.textContent=' Loading models…';try{fill(await R.discover());gs.textContent=' Models loaded.'}catch(e){gs.textContent=' '+e.message}}
+ async function load(){if(!R.useProxy&&!R.get(R.KEY)){gs.textContent='';return}gs.textContent=' Loading models…';try{fill(await R.discover());gs.textContent=' Models loaded.'}catch(e){gs.textContent=' '+e.message}}
  R.refresh=function(){var c=R.get(R.MODEL);if(c&&!Array.prototype.some.call(gm.options,function(o){return o.value===c})){var o=document.createElement('option');o.value=c;o.textContent=c;gm.appendChild(o)}gm.value=c};
- var m0=R.get(R.MODEL);if(/2\.5|1\.5|2\.0/.test(m0))R.set(R.MODEL,'');gm.value=R.get(R.MODEL)||'gemini-3.8-flash';
+ gk.value=R.get(R.KEY);var m0=R.get(R.MODEL);if(/2\.5|1\.5|2\.0/.test(m0))R.set(R.MODEL,'');gm.value=R.get(R.MODEL)||'gemini-3.8-flash';show();
+ var t;gk.oninput=function(){R.set(R.KEY,gk.value.trim());show();clearTimeout(t);t=setTimeout(load,700)};
  gm.onchange=function(){R.set(R.MODEL,gm.value)};gr.onclick=load;load()})();
 </script>
 </body>
