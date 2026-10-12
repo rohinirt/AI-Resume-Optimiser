@@ -1,71 +1,535 @@
-# Changelog
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Resume Optimiser</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+:root{--ink:#1B2433;--paper:#F3F5FA;--panel:#fff;--rule:#E1E6EF;--mute:#667085;--acc:#4C6EF5;--accs:#EDF1FF;--ok:#0E8F7E;--oks:#E4F5F2;--warn:#C26A0A;--warns:#FFF3E0;--bad:#D63A2F;--bads:#FDECEA;--track:#E8ECF4;--focus:#4C6EF5;--mark:#FFF1B8;--sh:0 1px 2px rgba(16,24,40,.06),0 6px 18px rgba(16,24,40,.06);
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--ink:#E8ECF4;--paper:#0F141B;--panel:#171E28;--rule:#2A3441;--mute:#98A2B3;--acc:#8EA4FF;--accs:#222C4A;--ok:#4FD1BC;--oks:#13302C;--warn:#F0A94E;--warns:#3A2A12;--bad:#FF8A80;--bads:#3C1B18;--track:#2A3441;--focus:#8EA4FF;--mark:#5A4A12;--sh:0 1px 2px rgba(0,0,0,.4),0 6px 18px rgba(0,0,0,.3)}}
+:root[data-theme="dark"]{--ink:#E8ECF4;--paper:#0F141B;--panel:#171E28;--rule:#2A3441;--mute:#98A2B3;--acc:#8EA4FF;--accs:#222C4A;--ok:#4FD1BC;--oks:#13302C;--warn:#F0A94E;--warns:#3A2A12;--bad:#FF8A80;--bads:#3C1B18;--track:#2A3441;--focus:#8EA4FF;--mark:#5A4A12;--sh:0 1px 2px rgba(0,0,0,.4),0 6px 18px rgba(0,0,0,.3)}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);font:14.5px/1.55 Inter,"Segoe UI",system-ui,-apple-system,Arial,sans-serif}
+main{display:grid;grid-template-columns:1fr;min-height:100vh}
+@media(min-width:1000px){main{grid-template-columns:minmax(0,5fr) minmax(0,6fr)}.pane{height:100vh;overflow-y:auto}}
+.pane{padding:24px}.l{border-right:1px solid var(--rule)}.r{container-type:inline-size;background:var(--paper)}
+.brand{display:flex;gap:12px;align-items:center;margin-bottom:18px}.logo{width:38px;height:38px;border-radius:10px;background:linear-gradient(135deg,var(--acc),var(--ok));display:grid;place-items:center;color:#fff;font-weight:700}
+h1{font-size:19px;margin:0;line-height:1.2}h2{font-size:13px;margin:22px 0 10px;text-transform:uppercase;letter-spacing:.06em;color:var(--mute)}
+.mute{color:var(--mute);font-size:13px}.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.card{background:var(--panel);border:1px solid var(--rule);border-radius:14px;box-shadow:var(--sh)}
+/* inputs */
+.inputs{margin-bottom:14px}.inputs>summary{list-style:none;cursor:pointer;padding:12px 14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.inputs>summary::-webkit-details-marker{display:none}.sumt{font-weight:700}.edit{margin-left:auto;font-size:13px;font-weight:600;color:var(--acc)}.edit::before{content:'Edit inputs'}details[open]>summary .edit::before{content:'Collapse'}
+.ig{padding:0 14px 14px;display:grid;gap:10px}.in{border:1px solid var(--rule);border-radius:10px;padding:10px 12px;background:var(--paper)}
+.in b{font-size:13px;display:flex;gap:8px;align-items:center}.n{width:20px;height:20px;border-radius:50%;background:var(--acc);color:var(--panel);font-size:11px;display:grid;place-items:center}
+textarea{width:100%;height:72px;margin-top:6px;border:1px solid var(--rule);border-radius:8px;padding:8px;font:12px/1.4 ui-monospace,Consolas,monospace;background:var(--panel);color:var(--ink)}
+input[type=file]{font-size:12px;max-width:100%;margin-top:6px}
+.pill{display:inline-flex;align-items:center;gap:4px;font-size:12px;border-radius:999px;padding:2px 10px;background:var(--track);color:var(--mute);font-weight:500}
+.pill.ok{background:var(--oks);color:var(--ok)}.pill.wn{background:var(--warns);color:var(--warn)}.pill.bd{background:var(--bads);color:var(--bad)}.pill.ac{background:var(--accs);color:var(--acc)}
+button{font:inherit;font-size:14px;font-weight:600;border-radius:10px;padding:9px 16px;cursor:pointer;border:1px solid var(--rule);background:var(--panel);color:var(--ink)}
+button.p{background:var(--acc);border-color:var(--acc);color:#fff}[data-theme="dark"] button.p{color:#0F141B}button:disabled{opacity:.45;cursor:default}
+button:focus-visible,textarea:focus-visible,summary:focus-visible,input:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+#status{font-size:13px;color:var(--mute);margin-top:10px;min-height:18px}.err{color:var(--bad)}
+/* rings + analysis */
+.ring{--s:56px;--i:6px;width:var(--s);height:var(--s);flex:none;border-radius:50%;display:grid;place-items:center;position:relative;background:conic-gradient(var(--c) calc(var(--p)*1%),var(--track) 0)}
+.ring::before{content:'';position:absolute;inset:var(--i);background:var(--panel);border-radius:50%}.ring span{position:relative;font-weight:700;font-variant-numeric:tabular-nums}
+.ring.xl{--s:96px;--i:9px}.ring.xl span{font-size:26px}
+.hero{padding:16px;display:flex;gap:16px;align-items:center;margin-top:16px}
+.verdict{padding:12px 14px;border-radius:12px;margin:12px 0;font-size:13.5px}.verdict.ok{background:var(--oks)}.verdict.warn{background:var(--warns)}.verdict.bad{background:var(--bads)}
+.fac{margin:10px 0}.fac>summary{list-style:none;cursor:pointer;padding:14px;display:grid;grid-template-columns:auto 1fr auto;gap:14px;align-items:center}
+.fac>summary::-webkit-details-marker{display:none}.fac h3{margin:0;font-size:14.5px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.fac .rs{color:var(--mute);font-size:12.5px;line-height:1.45;margin:2px 0 6px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}.fac[open] .rs{display:block;overflow:visible;-webkit-line-clamp:unset}
+.chev{width:22px;height:22px;transition:transform .2s;color:var(--mute)}details[open]>summary .chev{transform:rotate(180deg)}
+.fb{padding:0 14px 14px}.grp{font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin:12px 0 6px}
+.it{border-left:3px solid;border-radius:6px;background:var(--paper);padding:7px 10px;margin:6px 0;font-size:13px}.it.match{border-color:var(--ok)}.it.partial{border-color:var(--warn)}.it.missing{border-color:var(--bad)}
+.it q{color:var(--mute);font-style:italic;quotes:none}
+/* right pane */
+.bar{position:sticky;top:0;z-index:2;background:var(--paper);padding-bottom:10px;margin:-4px 0 6px}
+.tabs{display:flex;gap:4px;background:var(--track);padding:4px;border-radius:12px;margin:10px 0}.tabs button{flex:1;border:0;background:transparent;color:var(--mute);font-weight:600;font-size:13px;padding:7px 8px}.tabs button.on{background:var(--panel);color:var(--ink);box-shadow:var(--sh)}
+.empty{text-align:center;margin:12vh auto;max-width:36ch}
+.sec{padding:16px;margin:12px 0}.sec>h3{margin:0 0 10px;font-size:15px;display:flex;gap:8px;align-items:center}
+.rw2{display:grid;grid-template-columns:1fr;gap:8px;padding:10px 0;border-top:1px solid var(--rule)}.rw2:first-of-type{border-top:0}
+@container (min-width:660px){.rs2 .rw2{grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:16px}}
+.noreason .why2{display:none}.noreason .rw2{grid-template-columns:1fr!important}
+.txt{font-size:14px}.txt b{color:var(--ink);background:linear-gradient(transparent 62%,var(--accs) 62%)}
+.rm .txt{text-decoration:line-through;color:var(--mute)}
+.why2{font-size:12.5px;background:var(--paper);border-radius:10px;padding:9px 11px}.why2 div{margin:3px 0}.why2 i{font-style:normal;font-weight:700;color:var(--mute);display:inline-block;min-width:38px}
+.cmp{display:grid;grid-template-columns:1fr;gap:8px;margin-top:8px}@container (min-width:660px){.cmp{grid-template-columns:1fr 1fr}}
+.cmp>div{border:1px solid var(--rule);border-radius:10px;padding:9px;font-size:13px;background:var(--panel)}.cmp .a{background:var(--oks);border-color:transparent}
+mark{background:var(--mark);color:inherit;border-radius:3px;padding:0 2px}
+table{border-collapse:collapse;width:100%;font-size:13px}td,th{border-bottom:1px solid var(--rule);padding:7px 6px;text-align:left}
+.big{font-size:40px;font-weight:700;line-height:1}
+.spin{width:26px;height:26px;border:3px solid var(--track);border-top-color:var(--acc);border-radius:50%;animation:sp .8s linear infinite;margin:0 auto 12px}@keyframes sp{to{transform:rotate(360deg)}}
+.sk{height:84px;border-radius:14px;margin:10px 0;background:linear-gradient(90deg,var(--track),var(--panel),var(--track));background-size:200% 100%;animation:sh 1.2s linear infinite}@keyframes sh{to{background-position:-200% 0}}
+.stat{flex:1;min-width:110px}
+@media(prefers-reduced-motion:reduce){.chev{transition:none}.spin,.sk{animation:none}}
+#aiset .edit::before{content:"Change"}#aiset[open] .edit::before{content:"Collapse"}.evd{margin-top:8px;padding:8px 10px;border-radius:8px;background:var(--okbg,rgba(16,150,100,.10));font-size:12.5px;line-height:1.45}.evd q{display:block;margin:3px 0;font-style:italic}.nt{margin-top:6px}.nbtn{font-size:12px;font-weight:600;padding:3px 10px;border-radius:999px}.nflag{display:none;margin-left:6px}.nt.has .nflag{display:inline-flex}.nbox{margin-top:6px}.nbox textarea{height:64px;font:13px/1.4 Inter,system-ui,sans-serif}.nbox .mute{font-size:12px;margin-top:2px}</style>
+</head>
+<body>
+<main>
+<section class="pane l">
+  <div class="brand"><div class="logo">R</div><div><h1>Resume Optimiser</h1><div class="mute">Score against a job, then rewrite only from your own experience.</div></div></div>
+  <details id="aiset" class="card inputs">
+    <summary><span class="sumt">AI settings</span><span id="keyst" class="pill"></span><span class="edit"></span></summary>
+    <div class="ig"><div class="in">
+      <div id="keybox"><b><label for="gk">Gemini API key (free)</label></b>
+      <input id="gk" type="password" autocomplete="off" spellcheck="false" placeholder="Paste your key from aistudio.google.com/apikey" style="width:100%;margin:6px 0 8px;border:1px solid var(--rule);border-radius:8px;padding:8px;font:13px ui-monospace,Consolas,monospace;background:var(--panel);color:var(--ink)"></div>
+      <label for="gm" class="mute" style="display:block">Model</label>
+      <select id="gm" style="margin-top:4px;max-width:100%;border:1px solid var(--rule);border-radius:8px;padding:7px;background:var(--panel);color:var(--ink);font:inherit"><option value="gemini-3.8-flash">gemini-3.8-flash</option></select> <button id="gr" type="button" style="padding:6px 10px;font-size:13px">Refresh models</button><span id="gs" class="mute"></span>
+      <p class="mute" style="margin:8px 0 0">The key stays in this browser only. Your files are read in your browser and only their text is sent to Google's Gemini API.</p></div></div>
+  </details>
+  <details id="inp" class="card inputs" open>
+    <summary><span class="sumt">Inputs</span><span id="chips" class="row" style="gap:6px"></span><span class="edit"></span></summary>
+    <div class="ig">
+      <div class="in"><b><span class="n">1</span><label for="fr">Current resume (.docx, formatting is kept)</label></b><input id="fr" type="file" accept=".docx"></div>
+      <div class="in"><b><span class="n">2</span><label for="up">Extra experience details <span class="mute" style="font-weight:500">(optional)</span></label></b><input id="fu" type="file" accept=".docx,.txt,.md"><textarea id="up" placeholder="Optional: extra bullets, metrics or context for any job. Without it, the app works from your resume alone."></textarea></div>
+      <div class="in"><b><span class="n">3</span><label for="pj">Projects description <span class="mute" style="font-weight:500">(optional, include links)</span></label></b><input id="fp" type="file" accept=".docx,.txt,.md"><textarea id="pj" placeholder="Optional: projects to choose from, with links. Without it, the app uses the projects already on your resume."></textarea></div>
+      <div class="in"><b><span class="n">4</span><label for="jd">Job description</label></b><input id="fj" type="file" accept=".docx,.txt,.md"><textarea id="jd" placeholder="Upload a file or paste text"></textarea></div>
+    </div>
+  </details>
+  <div class="row"><button id="bs" class="p">Analyse match</button><button id="br" disabled>Rewrite my resume</button><span id="notecount" class="mute"></span></div>
+  <div id="status" role="status"></div><div id="notice" class="mute"></div>
+  <div id="an"></div>
+</section>
+<section class="pane r">
+  <div class="bar"><div class="row"><button class="p" id="dd" disabled>Download Word (.docx)</button><button id="dp" disabled>Download PDF</button></div>
+  <div class="tabs" role="tablist"><button class="on" data-t="res">Updated sections</button><button data-t="chg">Before and after</button><button data-t="kw">Keywords</button></div></div>
+  <div id="t-res"><div class="empty"><div class="logo" style="margin:0 auto 12px;width:46px;height:46px">✦</div><b>Your updated sections appear here</b><p class="mute">Add your resume and a job description (the other two inputs are optional), analyse the match, then rewrite.</p></div></div>
+  <div id="t-chg" hidden></div><div id="t-kw" hidden></div>
+</section>
+</main>
+<script>
+/* Standalone shim: replaces the claude.ai-only helpers with the free Gemini API and a normal browser download. */
+(function(){
+ var KEY='ro_gemini_key',MODEL='ro_gemini_model';
+ /* Set this to your Cloudflare Worker URL (no trailing slash). The Gemini key lives in the Worker, never in this page. */
+ var PROXY='https://YOUR-WORKER.YOUR-SUBDOMAIN.workers.dev';
+ var get=function(k){try{return localStorage.getItem(k)||''}catch(e){return''}},set=function(k,v){try{localStorage.setItem(k,v)}catch(e){}};
+ var sleep=function(ms){return new Promise(function(r){setTimeout(r,ms)})};
+ function parse(t){t=String(t||'').replace(/^\s*```(?:json)?/i,'').replace(/```\s*$/,'').trim();try{return JSON.parse(t)}catch(e){var a=t.indexOf('{'),b=t.lastIndexOf('}');if(a>=0&&b>a)return JSON.parse(t.slice(a,b+1));throw Error('The AI reply was not valid JSON. Please try again.')}}
+ var useProxy=!!window.__proxyOverride||!/YOUR-WORKER/.test(PROXY);
+ var BASE=useProxy?(window.__proxyOverride||PROXY)+'/v1beta/':'https://generativelanguage.googleapis.com/v1beta/';
+ var kh=function(h){var k=get(KEY);if(!useProxy&&k)h['x-goog-api-key']=k;return h};
+ async function discover(){var res;try{if(!useProxy&&!get(KEY))throw Error('Add your Gemini API key first.');res=await fetch(BASE+'models?pageSize=200',{headers:kh({})})}catch(e){if(/Add your/.test(e.message))throw e;throw Error('Could not reach the server.')}if(!res.ok)throw Error('Could not list models ('+res.status+')'+(useProxy?'.':'. Check your API key.'))
+  var d=await res.json(),ver=function(n){var m=/gemini-(\d+(?:\.\d+)?)/.exec(n);return m?parseFloat(m[1]):0};
+  return(d.models||[]).filter(function(m){var n=m.name||'';return(m.supportedGenerationMethods||[]).indexOf('generateContent')>=0&&/flash/.test(n)&&!/image|tts|live|audio|embed|robotics|computer|native/.test(n)})
+   .map(function(m){return{id:m.name.replace(/^models\//,''),label:m.displayName||m.name}})
+   .sort(function(a,b){return ver(b.id)-ver(a.id)||(/lite/.test(a.id)?1:0)-(/lite/.test(b.id)?1:0)||(/preview/.test(a.id)?1:0)-(/preview/.test(b.id)?1:0)})}
+ async function json(prompt,opts){
+  if(!useProxy&&!get(KEY))throw Error('Add your free Gemini API key under "AI settings" first.');
+  var model=get(MODEL)||'gemini-3.8-flash',url;
+  var body=JSON.stringify({contents:[{role:'user',parts:[{text:prompt}]}],generationConfig:{responseMimeType:'application/json',temperature:0.2}});
+  var last='';
+  var healed=false;
+  for(var a=0;a<4;a++){
+   url=BASE+'models/'+model+':generateContent';var res;try{res=await fetch(url,{method:'POST',headers:kh({'Content-Type':'application/json'}),body:body})}catch(e){throw Error('Could not reach the Gemini API. Check your internet connection.')}
+   if(res.ok){var d=await res.json(),c=(d.candidates||[])[0],parts=(c&&c.content&&c.content.parts)||[],text=parts.map(function(p){return p.text||''}).join('');
+    if(!text)throw Error('The AI returned an empty reply'+(c&&c.finishReason?' ('+c.finishReason+')':'')+'. Please try again.');
+    if(opts&&opts.onText)opts.onText({text:text});return parse(text)}
+   var msg='';try{msg=((await res.json()).error||{}).message||''}catch(e){}last=res.status+(msg?': '+msg:'');
+   if(res.status===404&&!healed){healed=true;try{var L=await discover();if(L.length&&L[0].id!==model){model=L[0].id;set(MODEL,model);if(window.__ro.refresh)window.__ro.refresh();a--;continue}}catch(e){}}
+   if(res.status===404)throw Error('This Gemini model is not available ('+last+'). Pick another model under AI model.');
+   if(res.status===400||res.status===401||res.status===403)throw Error('Gemini rejected the request ('+last+').'+(useProxy?' The site owner needs to check the server setup.':' Check that your API key is correct.'));
+   if(res.status===429||res.status>=500){await sleep(4000*(a+1));continue}
+   throw Error('Gemini error '+last)}
+  if(/^429/.test(last))throw Error('Free-tier limit reached. Wait a minute and try again, or switch the model to Flash-Lite under AI model.');
+  throw Error('Gemini is busy right now ('+last+'). Please try again.')}
+ var dl={save:async function(o){var u=URL.createObjectURL(o.data),a=document.createElement('a');a.href=u;a.download=o.filename;document.body.appendChild(a);a.click();a.remove();setTimeout(function(){URL.revokeObjectURL(u)},4000)}};
+ window.claude={use:async function(n){if(n==='sample')return{json:json};if(n==='downloads')return dl;throw Error('Unknown helper '+n)}};
+ window.__ro={get:get,set:set,KEY:KEY,MODEL:MODEL,discover:discover,useProxy:useProxy};
+})();
+</script>
+<script>
+/* Scoring engine: ESCO skill mapping + in-browser embeddings (all-MiniLM-L6-v2) + rule-based checks.
+   The AI is used only to read the resume and job description into structured data. All scores are computed here. */
+(function(){
+var WTS={skills:.4,title:.25,hard:.2,narr:.15};
+var st=null,embP=null,eCache={},escoCache=null,escoErrors=0,escoCalls=0;
+var norm=function(s){return String(s==null?'':s).toLowerCase().replace(/[^a-z0-9+#./ ]+/g,' ').replace(/\s+/g,' ').trim()};
+var rx=function(s){return s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')};
+var uniq=function(a){var s={},o=[];(a||[]).forEach(function(x){var k=norm(x);if(k&&!s[k]){s[k]=1;o.push(String(x).trim())}});return o};
+var clamp=function(v,a,b){return Math.max(a,Math.min(b,v))};
+var dot=function(a,b){var s=0;for(var i=0;i<a.length;i++)s+=a[i]*b[i];return s};
+var short=function(t,n){t=String(t||'');var w=t.split(/\s+/);return w.length>n?w.slice(0,n).join(' ')+'…':t};
 
-All notable changes to the Resume Optimiser, newest first. Versions are labelled after the fact from the project history. Exact dates were not recorded before 6 Oct 2026, so earlier versions are listed as "before 6 Oct".
+/* ---------- embeddings (runs in the browser, no key, no limit) ---------- */
+function loadEmb(progress){
+ if(!embP){embP=(async function(){
+  var T=await import('https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2');
+  T.env.allowLocalModels=false;
+  if(progress)progress('Loading the embedding model (about 25 MB the first time, then cached)…');
+  var pipe=await T.pipeline('feature-extraction','Xenova/all-MiniLM-L6-v2',{quantized:true});
+  return async function(texts){var out=[];for(var i=0;i<texts.length;i+=16){var o=await pipe(texts.slice(i,i+16),{pooling:'mean',normalize:true}),dim=o.dims[1],d=o.data;for(var j=0;j<o.dims[0];j++)out.push(Array.prototype.slice.call(d,j*dim,(j+1)*dim))}return out}})();
+  embP.catch(function(){embP=null})}
+ return embP}
+async function emb(texts,progress){var f=await(window.__embedOverride?Promise.resolve(window.__embedOverride):loadEmb(progress)),need=[];
+ texts.forEach(function(t){if(!(t in eCache)&&need.indexOf(t)<0)need.push(t)});
+ if(need.length){var v=await f(need);need.forEach(function(t,i){eCache[t]=v[i]})}
+ return texts.map(function(t){return eCache[t]})}
 
-## v0.8.1 – 12 Oct 2026
-**Fixed**
-- "Found in your experience" check wrongly showed "Not found in your extra files" for skills that are in the files. Cause: it matched the AI's answers back to gaps by exact label text.
-- Gaps now have IDs and are checked 10 at a time. Several reply shapes are accepted.
-- The prompt now counts close equivalents (MySQL for database management, permission and row-level access issues for access controls).
-- Cards say "Could not check this one" when a check fails, instead of "Not found".
-- A line under the score breakdown shows how many gaps were checked and how many have support.
+/* ---------- ESCO skill ontology (free EU API) ---------- */
+function loadEsco(){if(escoCache)return;try{escoCache=JSON.parse(localStorage.getItem('ro_esco')||'{}')}catch(e){escoCache={}}}
+function saveEsco(){try{localStorage.setItem('ro_esco',JSON.stringify(escoCache))}catch(e){}}
+function sane(term,label){var a=norm(term).split(' ').filter(function(w){return w.length>1}),b=norm(label);return a.some(function(w){return b.indexOf(w)>=0})||b.indexOf(norm(term))>=0}
+async function escoLookup(term){loadEsco();var k=norm(term);if(k in escoCache)return escoCache[k];escoCalls++;
+ try{var ctl=new AbortController(),t=setTimeout(function(){ctl.abort()},7000),
+  r=await fetch('https://ec.europa.eu/esco/api/search?language=en&type=skill&limit=1&text='+encodeURIComponent(k),{signal:ctl.signal,headers:{Accept:'application/json'}});clearTimeout(t);
+  if(!r.ok)throw Error('esco '+r.status);var j=await r.json(),h=j&&j._embedded&&j._embedded.results&&j._embedded.results[0],v=(h&&h.uri&&sane(term,h.title||''))?{uri:h.uri,label:h.title}:null;escoCache[k]=v;return v}
+ catch(e){escoErrors++;return undefined}}
+async function pool(items,n,fn){var i=0,w=[];for(var k=0;k<n;k++)w.push((async function(){while(i<items.length){var x=items[i++];await fn(x)}})());await Promise.all(w)}
+async function mapKeys(terms,P,progress){var all=uniq(terms),n=0;escoErrors=0;escoCalls=0;
+ await pool(all,6,async function(t){var h=await escoLookup(t);P.keys[norm(t)]=h?h.uri:'raw:'+norm(t);if(h)P.labels[norm(t)]=h.label;n++;if(progress&&n%5===0)progress('Mapping skills to ESCO… '+n+'/'+all.length)});
+ saveEsco();P.escoOk=escoCalls===0?P.escoOk:escoErrors<escoCalls*0.5}
 
-## v0.8 – 10 Oct 2026
-**Added**
-- Evidence search: after Analyse, missing and partial skill and narrative points are searched in the Extra experience and Projects files. Matches show a quote, where it came from, and a rewrite plan.
-- The rewrite prompt includes this evidence and applies it (source tagged "experience file").
-- After a rewrite, the Skills and Narrative lists show the re-scored resume with "Newly matched by rewrite" and "Improved by rewrite" tags.
+/* ---------- implicit skill inference (rules) ---------- */
+var RULES=[
+ {g:[['tableau','power bi','looker','looker studio','qlik']],inf:['data visualization','business intelligence']},
+ {g:[['python'],['pandas','numpy','scikit-learn','matplotlib','seaborn']],inf:['data analysis']},
+ {g:[['random forest','scikit-learn','xgboost','machine learning']],inf:['machine learning']},
+ {g:[['regression','hypothesis testing','statistical analysis','statistics']],inf:['statistical modeling']},
+ {g:[['a/b testing','ab testing','a/b tests','experimentation']],inf:['experimentation','hypothesis testing']},
+ {g:[['sql','bigquery','postgresql','mysql','snowflake','hive','impala']],inf:['data querying']},
+ {g:[['terraform'],['kubernetes','docker']],inf:['devops','infrastructure as code']},
+ {g:[['airflow','dbt','etl','data pipeline','pipelines']],inf:['data pipelines']}];
+function inferSkills(lower,terms){var has=function(w){return new RegExp('(^|[^a-z0-9])'+rx(w)+'($|[^a-z0-9])').test(lower)},out=[],seen={};
+ RULES.forEach(function(r){var from=[];var ok=r.g.every(function(grp){var h=grp.filter(has);if(h.length)from.push(h[0]);return h.length>0});
+  if(ok)r.inf.forEach(function(l){if(!seen[l]){seen[l]=1;out.push({label:l,from:from.slice()})}})});return out}
 
-**Changed**
-- Browser-key mode restored next to the server mode (see v0.7). With the `PROXY` line unset, visitors paste their own key, as before.
+/* ---------- scoring ---------- */
+var LADDER=[[/\b(intern|trainee)\b/,0],[/\b(junior|jr|associate|entry)\b/,1],[/\b(senior|sr|lead)\b/,3],[/\b(staff|principal|architect)\b/,4],[/\b(manager|head)\b/,4],[/\b(director)\b/,5],[/\b(vp|vice president)\b/,6]];
+var level=function(t){t=norm(t);for(var i=0;i<LADDER.length;i++)if(LADDER[i][0].test(t))return LADDER[i][1];return 2};
+var strip=function(t){return norm(t).replace(/\b(senior|sr|junior|jr|lead|staff|principal|associate|intern|trainee|entry|head|manager|director|vp|vice president|ii|iii|iv)\b/g,' ').replace(/\s+/g,' ').trim()};
+var DEG={none:0,associate:1,bachelor:2,master:3,phd:4};
 
-## v0.7 – 8 Oct 2026
-**Added**
-- Optional server mode: `worker/worker.js` (Cloudflare Worker) keeps the Gemini key secret. Set the `PROXY` line in `index.html` to hide the key box and leave only the model dropdown.
-- Worker only accepts your site's origin, only allows Gemini model calls, and caps request size.
+function months(s){if(!s)return null;s=String(s).trim().toLowerCase();if(/present|current|now/.test(s)){var d=new Date();return d.getFullYear()*12+d.getMonth()}var m=/^(\d{4})(?:[-/](\d{1,2}))?/.exec(s);return m?(+m[1])*12+((+m[2]||1)-1):null}
+function yearsOf(roles){var iv=[];(roles||[]).forEach(function(r){var a=months(r.start),b=months(r.end==null||r.end===''?'present':r.end);if(a!=null&&b!=null&&b>=a)iv.push([a,b+1])});
+ iv.sort(function(x,y){return x[0]-y[0]});var tot=0,cur=null;iv.forEach(function(v){if(!cur)cur=v.slice();else if(v[0]<=cur[1])cur[1]=Math.max(cur[1],v[1]);else{tot+=cur[1]-cur[0];cur=v.slice()}});if(cur)tot+=cur[1]-cur[0];return Math.round(tot/12*10)/10}
 
-**Changed**
-- Bullet rule relaxed: by default a role keeps the resume's bullet count. The AI may add up to 2 per role (never above 6) when the job or a note needs it. It may still cut weak bullets (minimum 3 per role).
+async function score(cand,text,jd,P,progress){
+ var lower=' '+String(text).toLowerCase()+' ',
+  has=function(t){var n=norm(t);return!!n&&new RegExp('(^|[^a-z0-9])'+rx(n)+'($|[^a-z0-9])').test(lower)};
+ var req=uniq(jd.required_skills),reqN=req.map(norm),pref=uniq(jd.preferred_skills).filter(function(x){return reqN.indexOf(norm(x))<0}),
+  jdT=req.concat(pref).slice(0,30),w=jdT.map(function(_,i){return i<req.length?1:.5});
+ var cT=uniq(cand.skills),inf=inferSkills(lower,cT);
+ var V=await emb(jdT.concat(cT,inf.map(function(i){return i.label})),progress),jV=V.slice(0,jdT.length),cV=V.slice(jdT.length,jdT.length+cT.length),iV=V.slice(jdT.length+cT.length);
+ var items=[],status={},vals=[];
+ jdT.forEach(function(j,i){var kj=P.keys[norm(j)],it={label:j+(i>=req.length?' (preferred)':''),status:'missing',where:'',note:'Not found in your resume.'},c=0,hit=null;
+  for(var a=0;a<cT.length&&!hit;a++)if(norm(cT[a])===norm(j)||(kj&&P.keys[norm(cT[a])]===kj))hit=cT[a];
+  if(hit){it.status='match';c=1;it.where=hit;it.note=kj&&kj.indexOf('raw:')!==0&&norm(hit)!==norm(j)?'Same skill in ESCO: '+(P.labels[norm(j)]||'')+'.':'Listed in your resume.'}
+  else if(has(j)){it.status='match';c=1;it.where=j;it.note='Mentioned in your resume text.'}
+  else{var best=-1,bi=-1;cV.forEach(function(v,a){var s=dot(jV[i],v);if(s>best){best=s;bi=a}});
+   var ii=-1,is=-1;iV.forEach(function(v,a){var s=dot(jV[i],v);if(s>is){is=s;ii=a}});
+   if(best>=.8){it.status='match';c=1;it.where=cT[bi];it.note='Same or very close skill (similarity '+best.toFixed(2)+').'}
+   else if(is>=.8){it.status='partial';c=.7;it.where=inf[ii].from.join(' + ');it.note='Inferred, not stated: '+inf[ii].label+' (from '+inf[ii].from.join(' + ')+').'}
+   else if(best>=.6){it.status='partial';c=.5;it.where=cT[bi];it.note='Related skill, not the same (similarity '+best.toFixed(2)+').'}
+   else if(bi>=0){it.note='Not found. Closest skill you list: '+cT[bi]+' (similarity '+best.toFixed(2)+').'}}
+  status[norm(j)]=it.status;items.push(it);vals.push(c)});
+ var sw=w.reduce(function(a,b){return a+b},0),sk=jdT.length?100*vals.reduce(function(a,c,i){return a+c*w[i]},0)/sw:50;
+ var nm=items.filter(function(i){return i.status==='match'}).length,np=items.filter(function(i){return i.status==='partial'}).length;
+ var F={skills:{score:Math.round(sk),items:items,
+  reason:jdT.length?nm+' of '+jdT.length+' JD skills are matched and '+np+' partly (related or inferred). Weighted coverage is '+Math.round(sk)+'%, with required skills counting double.':'No concrete skills were found in the job description.'}};
 
-## v0.6 – 6 Oct 2026
-**Added**
-- "I have this" notes on missing and partial Skills and Narrative points. The rewrite treats them as true evidence.
-- Extra experience and Projects inputs are optional. The app works from the resume and job description alone.
-- Generic roles: every job on the resume is handled, nothing is hard-coded to a company.
-- Bullets ordered by relevance and impact for the job, with an "Order" reason.
-- Download name `Name_Resume_Company_Role` (company left out if the JD does not name it).
+ /* title and seniority */
+ var tItems=[],titles=(cand.roles||[]).map(function(r){return r.title}).filter(Boolean).slice(0,3),famS=0,senS=0;
+ if(!titles.length||!jd.title){F.title={score:50,items:[{label:'Title',status:'partial',where:'',note:'A job title could not be read from the resume or the job description.'}],reason:'Titles could not be compared.'}}
+ else{var TV=await emb([strip(jd.title)||norm(jd.title)].concat(titles.map(function(t){return strip(t)||norm(t)})),progress),bt=0,bs=-1;
+  for(var t=1;t<TV.length;t++){var s=dot(TV[0],TV[t]);if(s>bs){bs=s;bt=t-1}}
+  famS=clamp((bs-.35)/.45,0,1);var jl=level(jd.title),cl=Math.max.apply(null,titles.map(level)),gap=jl-cl;senS=gap<=0?1:Math.max(0,1-.3*gap);
+  tItems.push({label:'Role family',status:famS>=.75?'match':famS>=.4?'partial':'missing',where:titles[bt],note:'Your closest title to "'+jd.title+'" is "'+titles[bt]+'" (similarity '+bs.toFixed(2)+').'});
+  tItems.push({label:'Seniority',status:gap<=0?'match':gap===1?'partial':'missing',where:'',note:gap<=0?'Your seniority is at or above what the title asks for.':'The job title sits '+gap+' level'+(gap>1?'s':'')+' above your most senior title.'});
+  var ts=Math.round(100*(.6*famS+.4*senS));F.title={score:ts,items:tItems,reason:'Role family fit is '+Math.round(famS*100)+'% (60% of this score) and seniority fit is '+Math.round(senS*100)+'% (40%), comparing "'+titles[bt]+'" with "'+jd.title+'".'}}
 
-## v0.5 – before 6 Oct
-**Fixed**
-- Score dropped after a rewrite because only rewritten sections were scored. The whole updated resume is now re-scored.
-- Added ATS TARGETS (keywords to keep and to add if true) and KEYWORD SAFETY to the rewrite prompt.
-- Added a list of keywords the rewrite dropped, one automatic repair pass, and a warning banner if the score is still lower.
-- Rewrite quality rules: strong action verbs, concrete results, no invented numbers.
+ /* hard requirements: exact checks in code */
+ var hItems=[],pts=[],yrs=yearsOf(cand.roles),minY=+jd.min_years||0;
+ if(minY>0){var ok=yrs>=minY,part=!ok&&yrs>=minY*.7;hItems.push({label:'At least '+minY+' years of experience',status:ok?'match':part?'partial':'missing',where:'',note:'Your dated roles add up to about '+yrs+' years.'});pts.push(ok?1:part?.5:0)}
+ var jdDeg=DEG[jd.degree]||0;if(jdDeg>0){var cd=DEG[cand.degree]||0,okd=cd>=jdDeg;hItems.push({label:jd.degree[0].toUpperCase()+jd.degree.slice(1)+' degree or higher',status:okd?'match':'missing',where:cand.degree&&cand.degree!=='none'?cand.degree+' degree':'',note:okd?'Your highest degree meets this.':'No matching degree was found on your resume.'});pts.push(okd?1:0)}
+ uniq(jd.certifications).forEach(function(c){var okc=(cand.certifications||[]).some(function(x){return norm(x).indexOf(norm(c))>=0||norm(c).indexOf(norm(x))>=0})||has(c);hItems.push({label:'Certification: '+c,status:okc?'match':'missing',where:'',note:okc?'Found on your resume.':'Not found on your resume.'});pts.push(okc?1:0)});
+ var hs=pts.length?Math.round(100*pts.reduce(function(a,b){return a+b},0)/pts.length):100;
+ if(!hItems.length)hItems.push({label:'Mandatory requirements',status:'match',where:'',note:'The job description lists no hard requirements.'});
+ F.hard={score:hs,items:hItems,reason:pts.length?pts.filter(function(p){return p===1}).length+' of '+pts.length+' mandatory requirements are fully met. These are checked exactly, not estimated.':'No mandatory requirements were found, so nothing can block this application.'};
 
-## v0.4 – before 6 Oct
-**Added**
-- Workday-style scoring engine: the AI only extracts data. Skills (40%) use the ESCO skill ontology, Title (25%) and Narrative (15%) use in-browser meaning-based matching, Hard requirements (20%) are checked exactly (years, degree, certifications).
-- Fallback to an AI estimate if the engine cannot run.
+ /* narrative: JD duties vs your bullets, embedding cosine similarity */
+ var duties=uniq(jd.duties).slice(0,12),bl=(cand.bullets||[]).filter(function(b){return String(b).trim()}),nItems=[],ns=0,avg=0;
+ if(!duties.length||!bl.length){F.narr={score:duties.length?0:50,items:[{label:'Duties',status:'partial',where:'',note:!bl.length?'No experience bullets were found.':'No duties were found in the job description.'}],reason:'Narrative fit could not be measured.'}}
+ else{var NV=await emb(duties.concat(bl),progress),dV=NV.slice(0,duties.length),bV=NV.slice(duties.length),sc=[];
+  duties.forEach(function(d,i){var b=-1,bi=0;bV.forEach(function(v,k){var s=dot(dV[i],v);if(s>b){b=s;bi=k}});sc.push(clamp((b-.25)/.4,0,1));avg+=b;
+   nItems.push({label:short(d,12),status:b>=.5?'match':b>=.35?'partial':'missing',where:short(bl[bi],12),note:'Closest bullet, similarity '+b.toFixed(2)+(b<.35?' (little overlap).':'.')})});
+  ns=Math.round(100*sc.reduce(function(a,b){return a+b},0)/sc.length);avg/=duties.length;
+  F.narr={score:ns,items:nItems,reason:'Each JD duty is compared with your bullets using meaning-based similarity. The average best match is '+avg.toFixed(2)+' ('+nItems.filter(function(i){return i.status==='match'}).length+' of '+duties.length+' duties clearly covered).'}}
+ return{F:F,status:status,jdT:jdT,req:req.length,years:yrs}}
 
-## v0.3 – before 6 Oct
-**Added / fixed**
-- Standalone GitHub Pages site using the free Gemini API, with a model dropdown and automatic model discovery (fixes retired-model 404s).
-- Retry and back-off on busy (503) and rate-limit (429) replies.
-- Project hyperlinks are read correctly and kept as real links.
-- Description text no longer clipped; keyword table counts; KPI shows percentages only; quality-check box removed; analysis resets on re-analyse.
+/* ---------- public API ---------- */
+var EXTRACT='Extract structured data. Return ONLY JSON, no markdown:\n{"resume":{"roles":[{"title":"","start":"YYYY-MM","end":"YYYY-MM or present"}],"skills":[""],"degree":"none|associate|bachelor|master|phd","certifications":[""],"bullets":[""]},"jd":{"title":"","required_skills":[""],"preferred_skills":[""],"min_years":0,"degree":"none|associate|bachelor|master|phd","certifications":[""],"duties":[""]}}\nRules: copy only what is written, no inference. resume.skills = every tool, language, platform and method named anywhere in the resume (skills section, bullets, projects). resume.bullets = every experience bullet, verbatim. resume.degree = the highest degree held. jd skills = concrete tools, technologies, methods and domain skills (no soft skills), split into required and preferred (nice to have, a plus), at most 30 in total. jd.certifications = mandatory ones only. jd.degree = the minimum degree the job requires. jd.duties = 5 to 12 short responsibilities. Use "" for unknown dates and 0 for unknown years.';
 
-## v0.2 – before 6 Oct
-**Added**
-- Upload resume (.docx), experience, projects and job description. ATS match score with deep analysis (hidden by default), rewrite of summary, experience bullets, projects and skills, with What / Why / How for each change.
-- Word download keeps original formatting, with job keywords in bold. PDF download.
-- Limits: summary 40–60 words, 1–2 bullets per project.
+async function analyse(resumeText,jdText,ask,progress){
+ progress=progress||function(){};progress('Reading your resume and the job description…');
+ var X=await ask(EXTRACT+'\nRESUME:\n'+resumeText+'\nJOB DESCRIPTION:\n'+jdText,'Reading your resume and the job description');
+ var cand=X.resume||{},jd=X.jd||{};cand.roles=cand.roles||[];cand.skills=cand.skills||[];cand.bullets=cand.bullets||[];
+ if(!window.__embedOverride)await loadEmb(progress);
+ var P={keys:{},labels:{},escoOk:true};
+ progress('Mapping skills to ESCO…');await mapKeys(uniq(cand.skills).concat(uniq((jd.required_skills||[]).concat(jd.preferred_skills||[]))),P,progress);
+ progress('Scoring…');var R=await score(cand,resumeText,jd,P,progress);
+ st={cand:cand,jd:jd,P:P,before:R,resumeText:resumeText};
+ var sc={};['skills','title','hard','narr'].forEach(function(k){sc[k]=R.F[k].score});
+ var ov=Math.round(sc.skills*WTS.skills+sc.title*WTS.title+sc.hard*WTS.hard+sc.narr*WTS.narr),fails=R.F.hard.items.filter(function(i){return i.status==='missing'}).map(function(i){return i.label});
+ var al=ov>=70?'strong':ov>=50?'moderate':'weak',note=al==='strong'?'Your resume covers most of what this job asks for.':al==='moderate'?'You cover part of what this job asks for. Review the missing items before applying.':'Many requirements are not covered by your resume. Apply only if your real experience closes these gaps.';
+ var factors={};['skills','title','hard','narr'].forEach(function(k){factors[k]={score:R.F[k].score,reason:R.F[k].reason,items:R.F[k].items}});
+ return{role:jd.title||'',aligned:al,alignment_note:note,blockers:fails,factors:factors,
+  engine:'Scoring engine: skills mapped with ESCO ('+(P.escoOk?'online':'unreachable, so skills were matched by meaning only')+'), meaning-based similarity from a local embedding model (all-MiniLM-L6-v2), requirements checked exactly in code. The AI only reads the text.'}}
 
-## v0.1 – before 6 Oct
-**Added**
-- First version: a Claude-powered artifact on claude.ai (AI-estimated scores).
-- Earlier Next.js prototype of the scoring pipeline (`resume-engine`).
+/* Re-scores the WHOLE updated resume (same inputs as the first score), so before and after are comparable. */
+async function after(r,newText){
+ if(!st)return;var tl=norm(newText),has=function(t){var n=norm(t);return!!n&&(' '+tl+' ').indexOf(' '+n+' ')>=0};
+ var skills=[],tools=[];
+ (r.skills||[]).forEach(function(s){var k=s.indexOf(':');(k>0?s.slice(k+1):s).split(/[,;]/).forEach(function(x){x=x.trim();if(x)skills.push(x)})});
+ (r.projects||[]).forEach(function(p){String(p.tools||'').split(/[,;]/).forEach(function(x){x=x.trim();if(x)tools.push(x)})});
+ var kept=(st.cand.skills||[]).filter(has),
+  bl=(st.cand.bullets||[]).filter(function(b){var n=norm(b);return n&&tl.indexOf(n)>=0}),
+  nb=[];(r.roles||[]).forEach(function(ro){nb=nb.concat(ro.bullets||[])});(r.projects||[]).forEach(function(p){nb=nb.concat(p.bullets||[])});
+ var cand={roles:st.cand.roles,degree:st.cand.degree,certifications:st.cand.certifications,skills:uniq(kept.concat(skills,tools)),bullets:bl.concat(nb)};
+ var P=st.P;await mapKeys(cand.skills,P,null);
+ var R=await score(cand,newText,st.jd,P,null),sc={};['skills','title','hard','narr'].forEach(function(k){sc[k]=R.F[k].score});
+ r.after_scores=sc;r.after_factors=R.F;
+ r.keywords=st.before.jdT.slice(0,25).map(function(t){var k=norm(t);return{kw:t,in_before:st.before.status[k]==='match',in_after:R.status[k]==='match'}});
+ r.lost_keywords=r.keywords.filter(function(x){return x.in_before&&!x.in_after}).map(function(x){return x.kw});
+ r.remaining_gaps=R.jdT.filter(function(t){return R.status[norm(t)]==='missing'}).slice(0,12)}
 
-## Known limits
-- Workday does not publish its scoring formula, so scores are a guide, not a prediction.
-- The "Current match" score reflects the uploaded resume only. Experience files and notes affect the rewrite, and the "After rewrite" score.
-- The shared free Gemini quota applies to every visitor in server mode.
+window.ENGINE={analyse:analyse,after:after,reset:function(){st=null}};
+})();
+
+</script>
+<script>
+var NS='http://schemas.openxmlformats.org/wordprocessingml/2006/main',WT={skills:.4,title:.25,hard:.2,narr:.15},FN={skills:'Skills coverage',title:'Title and seniority',hard:'Hard requirements',narr:'Narrative and scope'};
+var $=function(i){return document.getElementById(i)},esc=function(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})};
+var S={notes:{},noteLabels:{},buf:null,fname:'',zip:null,doc:null,paras:[],an:null,rw:null,origText:null,sample:null,dl:null,reason:true};
+var tg=function(n,t){return Array.prototype.slice.call(n.getElementsByTagNameNS(NS,t))};
+var ptext=function(p){return tg(p,'t').map(function(t){return t.textContent}).join('')};
+var wc=function(s){return (String(s||'').trim().match(/\S+/g)||[]).length};
+var col=function(s){return s>=75?'var(--ok)':s>=50?'var(--warn)':'var(--bad)'};
+var ring=function(v,cls){return '<div class="ring '+(cls||'')+'" style="--p:'+v+';--c:'+col(v)+'"><span>'+v+'</span></div>'};
+var RNS='http://schemas.openxmlformats.org/officeDocument/2006/relationships';
+async function parseDocx(buf){var zip=await JSZip.loadAsync(buf),f=zip.file('word/document.xml');if(!f)throw Error('Not a valid .docx file');var doc=new DOMParser().parseFromString(await f.async('string'),'application/xml');
+ var rf=zip.file('word/_rels/document.xml.rels'),relDoc=rf?new DOMParser().parseFromString(await rf.async('string'),'application/xml'):null,rels={};
+ if(relDoc)Array.prototype.forEach.call(relDoc.getElementsByTagName('Relationship'),function(r){rels[r.getAttribute('Id')]=r.getAttribute('Target')});
+ return{zip:zip,doc:doc,paras:tg(doc,'p'),rels:rels,relDoc:relDoc}}
+/* text of a paragraph with hyperlink targets appended, e.g. "Link (https://...)" */
+function walk(n,rels,st){for(var c=n.firstChild;c;c=c.nextSibling){if(c.nodeType!==1)continue;var l=c.localName;
+ if(l==='t')st.s+=c.textContent;else if(l==='tab')st.s+=' ';
+ else if(l==='instrText'){var m=c.textContent.match(/HYPERLINK\s+"([^"]+)"/);if(m)st.u=m[1]}
+ else if(l==='fldChar'&&c.getAttributeNS(NS,'fldCharType')==='end'&&st.u){st.s+=' ('+st.u+')';st.u=null}
+ else if(l==='hyperlink'){walk(c,rels,st);var id=c.getAttributeNS(RNS,'id'),u=id&&rels[id];if(u)st.s+=' ('+u+')'}
+ else walk(c,rels,st)}}
+function ptextL(p,rels){var st={s:'',u:null};walk(p,rels,st);return st.s}
+async function loadResume(){var d=await parseDocx(S.buf);S.zip=d.zip;S.doc=d.doc;S.paras=d.paras;S.relDoc=d.relDoc;if(S.origText==null)S.origText=resumeText()}
+async function readAny(f){if(/\.docx$/i.test(f.name)){var d=await parseDocx(await f.arrayBuffer());return d.paras.map(function(p){return ptextL(p,d.rels)}).filter(function(t){return t.trim()}).join('\n')}return f.text()}
+function liveText(){return tg(S.doc,'p').map(ptext).filter(function(t){return t.trim()}).join('\n')}
+function resumeText(){return S.paras.map(ptext).filter(function(t){return t.trim()}).join('\n')}
+function indexed(){return S.paras.map(function(p,i){return[i,ptext(p).trim()]}).filter(function(x){return x[1]}).map(function(x){return x[0]+'| '+x[1]}).join('\n')}
+function chips(){var it=[['Resume',S.buf?S.fname:''],['Extra details',wc($('up').value)?wc($('up').value)+' words':''],['Projects',wc($('pj').value)?wc($('pj').value)+' words':''],['Job',wc($('jd').value)?wc($('jd').value)+' words':'']];
+ $('chips').innerHTML=it.map(function(i){return '<span class="pill '+(i[1]?'ok':'')+'">'+(i[1]?'✓ ':'')+i[0]+(i[1]?' · '+esc(i[1]):'')+'</span>'}).join('')}
+chips();['up','pj','jd'].forEach(function(i){$(i).oninput=chips});
+function ready(){$('notice').textContent=S.sample?'':'AI features need this page opened in claude.ai while signed in.';$('bs').disabled=!S.sample}
+(async function(){try{S.sample=window.claude&&await claude.use('sample')}catch(e){}try{S.dl=window.claude&&await claude.use('downloads')}catch(e){}ready()})();
+$('fr').onchange=async function(e){try{var f=e.target.files[0];S.origText=null;S.buf=await f.arrayBuffer();S.fname=f.name;await loadResume();chips()}catch(x){$('status').innerHTML='<span class="err">'+esc(x.message)+'</span>'}};
+[['fu','up'],['fp','pj'],['fj','jd']].forEach(function(p){$(p[0]).onchange=async function(e){try{$(p[1]).value=await readAny(e.target.files[0]);chips()}catch(x){$('status').innerHTML='<span class="err">'+esc(x.message)+'</span>'}}});
+document.querySelectorAll('.tabs button').forEach(function(b){b.onclick=function(){document.querySelectorAll('.tabs button').forEach(function(x){x.classList.toggle('on',x===b)});['res','chg','kw'].forEach(function(t){$('t-'+t).hidden=t!==b.dataset.t})}});
+async function ask(prompt,label){$('status').textContent=label+'…';return S.sample.json(prompt,{cache:false,onText:function(u){$('status').textContent=label+'… '+u.text.length+' characters'}})}
+function need(){if(!S.buf){$('inp').open=true;$('status').innerHTML='<span class="err">Upload your resume (.docx) first.</span>';return false}if(!$('jd').value.trim()){$('inp').open=true;$('status').innerHTML='<span class="err">Add the job description.</span>';return false}return true}
+function overall(s){return Math.round(['skills','title','hard','narr'].reduce(function(a,k){return a+(+s[k]||0)*WT[k]},0))}
+
+/* ---------- Analyse ---------- */
+var EMPTY='<div class="empty"><div class="logo" style="margin:0 auto 12px;width:46px;height:46px">✦</div><b>Your updated sections appear here</b><p class="mute">Add your resume and a job description (the other two inputs are optional), analyse the match, then rewrite.</p></div>';
+function busy(msg){return '<div class="empty"><div class="spin"></div><b>'+msg+'</b><p class="mute">This can take up to a minute.</p></div>'}
+function resetOut(msg,keepAn){S.rw=null;S.limitProblems=[];$('dd').disabled=true;$('dp').disabled=true;$('t-res').innerHTML=busy(msg);$('t-chg').innerHTML='';$('t-kw').innerHTML='';if(!keepAn)$('an').innerHTML='<h2>ATS match</h2><div class="sk"></div><div class="sk"></div><div class="sk"></div><div class="sk"></div>'}
+$('bs').onclick=async function(){if(!need())return;$('bs').disabled=true;$('br').disabled=true;$('inp').open=false;resetOut('Analysing your resume');
+ try{S.an=null;S.engineErr='';if(window.ENGINE){try{ENGINE.reset();S.an=await ENGINE.analyse(resumeText(),$('jd').value,ask,function(m){$('status').textContent=m})}catch(e){S.engineErr=e.message||'engine failed';S.an=null;$('status').textContent='Scoring engine unavailable, using an AI estimate instead…'}}
+ if(!S.an)S.an=await ask('You are an ATS analyst modelled on Workday-style screening. Compare the RESUME with the JOB DESCRIPTION. Return ONLY JSON, no markdown:\n{"role":"JD title","aligned":"strong|moderate|weak","alignment_note":"1-2 sentences","blockers":["hard blockers if any"],"factors":{"skills":F,"title":F,"hard":F,"narr":F}}\nwhere F={"score":0-100,"reason":"2 sentences on why this score","items":[{"label":"short","status":"match|partial|missing","where":"quote of 12 words max from the resume proving it, or empty","note":"one sentence on why it affects the score"}]} with 6-12 items per factor.\nskills: JD required/preferred skills, tools, methods. title: title, seniority and domain fit. hard: years of experience, degree, certifications, location and anything mandatory. narr: JD duties versus the scope, scale and outcomes the resume bullets show. Be strict and consistent.\nRESUME:\n'+resumeText()+'\nJOB DESCRIPTION:\n'+$('jd').value,'Analysing');
+  if(S.engineErr&&S.an&&!S.an.engine)S.an.engine='AI estimate only. The scoring engine could not run ('+S.engineErr+').';
+  S.ev={};S.evSig='';S.evInfo='';try{await scanEvidence()}catch(e){S.ev={};S.evSig='';S.evInfo='Could not check your experience files this time. The rewrite still searches them.'}
+  $('status').textContent='';renderAn();$('br').disabled=false;$('br').textContent=S.an.aligned==='weak'?'Rewrite anyway':'Rewrite my resume'}
+ catch(e){$('an').innerHTML='';$('t-res').innerHTML=EMPTY;$('status').innerHTML='<span class="err">'+esc(e.message||e.code||'Failed')+'</span>'}$('bs').disabled=false;if(S.an)$('t-res').innerHTML='<div class="empty"><b>Analysis ready</b><p class="mute">Select “'+$('br').textContent+'” to generate your updated sections.</p></div>'};
+S.ev={};S.evSig='';
+function extraText(){return($('up').value.trim()?'EXTRA EXPERIENCE:\n'+$('up').value.trim()+'\n':'')+($('pj').value.trim()?'PROJECTS FILE:\n'+$('pj').value.trim()+'\n':'')}
+function gapItems(){var o=[];['skills','narr'].forEach(function(k){var f=S.an&&S.an.factors&&S.an.factors[k];((f&&f.items)||[]).forEach(function(i){if(i.status!=='match')o.push({k:k,label:String(i.label||'').replace(/ \(preferred\)$/,''),note:i.note||''})})});return o}
+async function scanEvidence(){var x=extraText(),sig=x+'|'+(S.an&&S.an.role||'');if(!x||!S.an||sig===S.evSig)return;var g=gapItems();if(!g.length){S.evSig=sig;S.evInfo='';return}
+ g.forEach(function(i,n){i.id='G'+(n+1)});S.ev={};var done=0,hit=0,fail=0;
+ for(var a=0;a<g.length;a+=10){var ch=g.slice(a,a+10),r;
+  try{r=await ask('You check whether a person\'s extra experience files truthfully support skills or duties that their resume does not show. Return ONLY JSON, no markdown.\nFor EVERY gap below, search the EXTRA FILES carefully, reading all of them. Set "found" to true when the files show that skill, tool or duty, or a close real equivalent: the same tool by another name, a more specific tool (MySQL for database management, Looker Studio or Power BI for data visualisation tools, Gemini or Cursor for Gen AI), or the same activity described in other words (investigating permission and row-level access issues is evidence for access controls and governance; triaging pipeline failures is evidence for troubleshooting and data pipelines). Set found to false only if nothing in the files supports it. Never invent. When found, give "evidence" (a quote of at most 25 words copied from the files), "where" (the job or project it comes from) and "plan" (one or two sentences: which resume section or role should carry it and how to word it with the JD term).\nReturn one item for every gap, using its id.\nSchema: {"items":[{"id":"G1","found":true,"evidence":"","where":"","plan":""}]}\nGAPS:\n'+ch.map(function(i){return i.id+': '+i.label+(i.note?' ('+i.note+')':'')}).join('\n')+'\nRESUME:\n'+resumeText()+'\nEXTRA FILES:\n'+x+'\nJOB DESCRIPTION:\n'+$('jd').value,'Looking for evidence in your experience files ('+Math.min(a+10,g.length)+' of '+g.length+')')}catch(e){fail+=ch.length;continue}
+  var list=Array.isArray(r)?r:(r&&Array.isArray(r.items)?r.items:(r?(Object.keys(r).map(function(k){return Array.isArray(r[k])?r[k]:null}).filter(Boolean)[0]||[]):[]));
+  ch.forEach(function(gi,n){var e=list.filter(function(z){return z&&String(z.id||'').toUpperCase()===gi.id})[0]||list.filter(function(z){return z&&norm(z.label)===norm(gi.label)})[0]||(list.length===ch.length?list[n]:null);
+   if(e){S.ev[norm(gi.label)]={label:gi.label,found:e.found===true||e.found==='true',evidence:e.evidence,where:e.where,plan:e.plan};done++;if(S.ev[norm(gi.label)].found)hit++}else fail++})}
+ S.evInfo=done?('Checked your experience files for '+done+' gaps and found support for '+hit+'.'+(fail?' '+fail+' could not be checked.':'')):'';
+ S.evSig=done?sig:'';if(!done&&fail)throw Error('The evidence check failed')}
+function evUI(i,st){if(st==='match'||!S.evSig)return'';var e=S.ev[norm(String(i.label).replace(/ \(preferred\)$/,''))];
+ if(!e)return '<div class="mute" style="font-size:12px;margin-top:6px">Could not check this one against your extra files.</div>';
+ if(!e.found)return '<div class="mute" style="font-size:12px;margin-top:6px">Not found in your extra files either.</div>';
+ return '<div class="evd"><b>Found in your experience'+(e.where?' ('+esc(e.where)+')':'')+'</b>'+(e.evidence?'<q>“'+esc(e.evidence)+'”</q>':'')+'<div><i>Rewrite plan:</i> '+esc(e.plan||'')+'</div></div>'}
+function evText(){var o=[];Object.keys(S.ev).forEach(function(k){var e=S.ev[k];if(e&&e.found)o.push('- '+e.label+': evidence "'+(e.evidence||'')+'" ('+(e.where||'extra files')+'). Plan: '+(e.plan||''))});
+ return o.length?'\nEVIDENCE FOUND IN THE EXTRA FILES. These gaps in the resume are supported by the extra files. Add each one to the resume as planned, using the exact JD wording, in the most relevant role, project, the summary or the skills line. Rewrite or replace a weaker bullet, or add one under the BULLET COUNT limits. Put "experience file" in changes[].source for these. Only use what the evidence shows.\n'+o.join('\n'):''}
+function noteUI(k,i,st){if((k!=='skills'&&k!=='narr')||st==='match')return'';var key=k+'|'+norm(i.label),v=S.notes[key]||'';S.noteLabels[key]=String(i.label).replace(/ \(preferred\)$/,'');
+ return '<div class="nt'+(v?' has':'')+'"><button type="button" class="nbtn" data-k="'+esc(key)+'">'+(v?'Edit my note':'I have this')+'</button><span class="pill ok nflag">Note added</span><div class="nbox"'+(v?'':' hidden')+'><textarea data-k="'+esc(key)+'" placeholder="How did you use this? Describe the work, the tools and the result in your own words, and say where it fits on your resume (for example, under which job).">'+esc(v)+'</textarea><div class="mute">Used in the rewrite as true evidence. Nothing is added beyond what you write.</div></div></div>'}
+function updNoteCount(){var c=Object.keys(S.notes).filter(function(k){return S.notes[k]}).length;$('notecount').textContent=c?c+' note'+(c>1?'s':'')+' will be used in the rewrite.':''}
+$('an').addEventListener('click',function(e){var b=e.target.closest&&e.target.closest('.nbtn');if(!b)return;var box=b.parentNode.querySelector('.nbox');box.hidden=!box.hidden;if(!box.hidden)box.querySelector('textarea').focus()});
+$('an').addEventListener('input',function(e){var t=e.target;if(!t.matches||!t.matches('textarea[data-k]'))return;var v=t.value.trim();S.notes[t.dataset.k]=v;var nt=t.closest('.nt');nt.classList.toggle('has',!!v);nt.querySelector('.nbtn').textContent=v?'Edit my note':'I have this';updNoteCount()});
+function renderAn(){var wasOpen=[].map.call(document.querySelectorAll('#an details.fac'),function(d){return d.open});var a=S.an,sc={};Object.keys(WT).forEach(function(k){sc[k]=Math.round(+a.factors[k].score||0)});var ov=overall(sc),af=S.rw&&S.rw.after_scores,ao=af?overall(af):null,cur=ao!=null?ao:ov,vc=a.aligned==='strong'?'ok':a.aligned==='weak'?'bad':'warn';
+ var h='<h2>ATS match</h2><div class="card hero">'+ring(cur,'xl')+'<div><div style="font-size:16px;font-weight:700">'+(ao!=null?'After rewrite':'Current match')+(ao!=null?' <span class="pill '+(ao>=ov?'ok':'wn')+'">'+(ao>=ov?'+':'\u2212')+Math.abs(ao-ov)+' pts</span>':'')+'</div><div class="mute">'+(ao!=null?(a.engine&&a.engine.indexOf('Scoring engine')===0?'Measured on the full updated resume. Was ':'Estimated. Was ')+ov+'%.':(a.engine&&a.engine.indexOf('Scoring engine')===0?'Measured by the scoring engine, not by Workday itself.':'Estimated by AI, not by Workday itself.'))+'</div><div class="mute" style="margin-top:4px">'+esc(a.role||'')+'</div></div></div>';
+ h+='<div class="verdict '+vc+'"><b>Role alignment: '+esc(a.aligned)+'</b><div>'+esc(a.alignment_note)+'</div>'+((a.blockers||[]).length?'<div style="margin-top:6px">'+a.blockers.map(function(b){return '<span class="pill bd">'+esc(b)+'</span> '}).join('')+'</div>':'')+(a.aligned==='weak'?'<div style="margin-top:6px">Rewriting only rephrases real experience. It cannot close a gap that is genuinely there.</div>':'')+'</div>';
+ h+='<h2>Score breakdown</h2>'+(S.evInfo?'<div class="mute" style="margin:-4px 0 10px;font-size:12px">'+esc(S.evInfo)+'</div>':'')+(a.engine?'<div class="mute" style="margin:-4px 0 10px;font-size:12px">'+esc(a.engine)+'</div>':'');
+ Object.keys(WT).forEach(function(k){var f0=a.factors[k],f=(S.rw&&S.rw.after_factors&&S.rw.after_factors[k])||f0,it=f.items||[],g={match:[],partial:[],missing:[]},pr={},rk={missing:0,partial:1,match:2};(f0.items||[]).forEach(function(i){pr[norm(i.label)]=i.status});it.forEach(function(i){var p=pr[norm(i.label)];i._up=S.rw&&S.rw.after_factors&&p&&rk[i.status]>rk[p]?(p==='missing'&&i.status==='match'?'Newly matched':'Improved'):'';(g[i.status]||g.missing).push(i)});var v=af?Math.round(af[k]):sc[k];
+  h+='<details class="card fac"><summary>'+ring(v)+'<div><h3>'+FN[k]+'<span class="pill ac">'+WT[k]*100+'% weight</span>'+(af?'<span class="pill">was '+sc[k]+'</span>':'')+'</h3><div class="rs">'+esc(f.reason)+'</div><div class="row" style="gap:6px"><span class="pill ok">'+g.match.length+' matched</span><span class="pill wn">'+g.partial.length+' partial</span><span class="pill bd">'+g.missing.length+' missing</span></div></div><svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg></summary><div class="fb">';
+  [['missing','Missing','bad'],['partial','Partial','warn'],['match','Matched','ok']].forEach(function(s){if(!g[s[0]].length)return;h+='<div class="grp" style="color:var(--'+s[2]+')">'+s[1]+'</div>'+g[s[0]].map(function(i){return '<div class="it '+s[0]+'"><b>'+esc(i.label)+'</b>'+(i._up?' <span class="pill ok">'+i._up+' by rewrite</span>':'')+(i.where?' <q>“'+esc(i.where)+'”</q>':'')+'<div class="mute">'+esc(i.note)+'</div>'+((k==='skills'||k==='narr')?evUI(i,s[0]):'')+noteUI(k,i,s[0])+'</div>'}).join('')});
+  h+='</div></details>'});
+ if(S.rw&&(S.rw.remaining_gaps||[]).length)h+='<h2>Still missing after rewrite</h2><div class="row" style="gap:6px">'+S.rw.remaining_gaps.map(function(g){return '<span class="pill wn">'+esc(g)+'</span>'}).join('')+'</div>';
+ $('an').innerHTML=h;[].forEach.call(document.querySelectorAll('#an details.fac'),function(d,i){if(wasOpen[i])d.open=true});updNoteCount()}
+
+/* ---------- Rewrite ---------- */
+var RULES=`RULES: Use ONLY facts found in the RESUME, the optional EXTRA EXPERIENCE file, the optional PROJECTS FILE and the USER NOTES. If an optional file is empty, work from the RESUME alone. Every number, percentage, tool and employer you write must appear in those sources. Copy numbers exactly, keep "~" where the source says approximate, and never round, estimate or invent a metric. If a bullet has no verified number, write the result without one. Use a JD keyword only where it truthfully describes something in those sources. Never invent employers, job titles, dates, schools or projects.`;
+function hasProjFile(){return !!$('pj').value.trim()}
+function maxProj(r){var P=(r.layout||{}).projects;if(!P)return 0;return hasProjFile()?2:Math.min(2,Math.max(1,+P.count||2))}
+function targetsText(){if(!S.an||!S.an.factors||!S.an.factors.skills)return'';
+ var it=S.an.factors.skills.items||[],nm=function(x){return String(x.label||'').replace(/ \(preferred\)$/,'')},
+  keep=it.filter(function(x){return x.status==='match'}).map(nm),add=it.filter(function(x){return x.status!=='match'}).map(nm);
+ if(!keep.length&&!add.length)return'';
+ return `\nATS TARGETS (measured on the current resume). KEEP, already matched, must stay in the final text: ${keep.join(', ')||'none'}. ADD IF TRUE, missing or only partly matched: ${add.join(', ')||'none'}. For each ADD term, search the EXTRA EXPERIENCE, the PROJECTS FILE and the USER NOTES. If a source truthfully shows that skill or a close equivalent, use the exact JD wording for it in the summary, a bullet, a project line or the skills line. A term that has a USER NOTE counts as shown. If no source shows it, do not add it and list it in remaining_gaps. The skills section has no length limit: list every KEEP term and every supported ADD term there, exactly as the JD spells it.`}
+function notesText(){var o=[];Object.keys(S.notes).forEach(function(k){var v=(S.notes[k]||'').trim();if(v)o.push('- '+(S.noteLabels[k]||k.split('|')[1])+': '+v)});
+ return o.length?`\nUSER NOTES. The user confirms these are true and explains how they did the work and how to show it on the resume. Treat each note as real evidence, equal to the resume. For each one, work it into the most relevant role or project, the summary or the skills line, using the user's own details and the exact JD wording for the skill. Do not add numbers, tools or claims the note does not give. If a note needs its own bullet, you may add one under the BULLET COUNT limits; otherwise replace or merge a weaker bullet. Put "user note" in changes[].source for anything that comes from a note.\n${o.join('\n')}`:''}
+function rwPrompt(fb){var pf=hasProjFile();
+ return `You edit a resume to fit a job description without inventing anything. Return ONLY JSON, no markdown.
+${RULES}
+BULLET QUALITY: Start each bullet with a strong, specific verb (Built, Automated, Reduced, Designed, Led, Streamlined, Analysed, Delivered). Never start with "Responsible for", "Worked on", "Helped", "Assisted" or "Involved in". Structure: strong verb + what you did + how (tools or method) + result. The result must be concrete: use a verified number from the sources where one exists; otherwise state the real outcome in plain words (what changed, who benefited, what got faster or simpler). Never invent a figure. Do not use the same opening verb twice across the whole resume. Before answering, check every bullet against these rules and fix any that fail.
+BULLET EDITING: review every existing bullet against the JD. For each, decide KEEP (already strong), REWRITE (same fact, better wording and keywords), REMOVE (irrelevant or weak for this JD) or REORDER. A new bullet may only replace a removed one, and only when the sources support a JD-relevant achievement that is not on the resume yet.
+BULLET COUNT: by default keep the same number of bullets per role as the resume. You may add bullets (at most 2 extra per role, and never more than 6 in one role) only when the sources show a real achievement that the JD asks for and that no existing bullet covers, or when a USER NOTE needs its own bullet. Prefer replacing a weak bullet over adding. You may write fewer when bullets are weak or irrelevant, but keep at least 3 per role (or all of them if the role has fewer). Mark each added bullet with action "add". Keep every role of the resume, in its original order.
+ORDER: inside every role and every project, order the bullets for THIS job: the strongest evidence of the JD's top requirements first, then the highest measurable impact, then the rest. Say why in "order_reason" (one sentence). For each moved bullet, fill "order" in its change entry (for example "was bullet 3, now bullet 1").
+SUMMARY: 40-60 words, written for this job. If the resume has no summary section, set layout.summary to null and summary to "".
+PROJECTS: ${pf?'choose the 2 projects, from the PROJECTS FILE and the resume itself, that fit this job best, 1-2 bullets each, most relevant first.':'use only the projects already on the resume, at most as many as it has (never more than 2), 1-2 bullets each, most relevant first.'} For each project give "tools" (the tools and languages named on its title line or in its description) and "link" (the exact URL in parentheses after "Link" or "GitHub" on its title line, empty string if none). Never invent a URL or a tool. If the resume has no projects section, set layout.projects to null and projects to [].${targetsText()}${evText()}${notesText()}
+KEYWORD SAFETY: every JD keyword, skill or tool that the current RESUME already contains must still appear in your final text (summary, a bullet, a project line or the skills line). Never drop one to save space. Rewriting must not lower the match.
+LAYOUT: The RESUME is given as "index| text" paragraphs. Give paragraph indexes so the new text can replace the old. For every job or experience entry on the resume (any employer, in resume order) add one object to "roles" with "company", "title", "paras" (the indexes of that entry's bullet paragraphs only: not the section heading, not the line with company, title and dates) and "tpl" (the index of one of those bullet paragraphs, whose formatting is reused). For projects give "titleTpl", "bulletTpl", "paras" (title lines and bullets) and "count" (how many projects the resume has). For summary and skills give "tpl" and "paras" (body only, not the heading). Use null for a section that does not exist. Never use the same paragraph index twice.
+Schema:
+{"meta":{"name":"the candidate's full name from the resume","company":"the company that is hiring, from the job description, empty if not stated","role":"the job title from the job description"},"layout":{"summary":{"tpl":0,"paras":[0]},"projects":{"titleTpl":0,"bulletTpl":0,"paras":[0],"count":0},"skills":{"tpl":0,"paras":[0]}},"summary":"","roles":[{"company":"","title":"","tpl":0,"paras":[0],"bullets":[""],"order_reason":""}],"projects":[{"name":"","tools":"","link":"","bullets":[""],"order_reason":""}],"skills":["Category: item, item"],"bold_terms":["JD keywords, skills, tools and methods that appear in the new text, 20-40"],"changes":[{"section":"Summary|Experience: <company>|Project: <name>|Skills","action":"keep|rewrite|add|remove|reorder","before":"original text, empty if new","after":"exact final text, empty if removed","order":"was bullet N, now bullet M, or empty","what":"what changed","why":"which JD requirement or keyword it targets, or why it was kept, moved or removed","how":"how the wording changed","keywords_added":["exact words in after that come from the JD"],"source":"resume | extra experience | projects file | user note"}],"keywords":[{"kw":"JD keyword","in_before":true,"in_after":true}],"after_scores":{"skills":0,"title":0,"hard":0,"narr":0},"remaining_gaps":["JD requirements still not evidenced"]}
+One change entry per original bullet (keep, rewrite, reorder or remove), one per new bullet (add), one for the summary, one for skills, and one per project bullet. "after" must equal the final bullet text exactly. 15-25 keywords.${fb?'\nFIX THESE PROBLEMS FROM YOUR LAST ATTEMPT: '+fb:''}
+RESUME:
+${indexed()}
+EXTRA EXPERIENCE (optional):
+${$('up').value.trim()||'(none)'}
+PROJECTS FILE (optional):
+${$('pj').value.trim()||'(none)'}
+JOB DESCRIPTION:
+${$('jd').value}`}
+function capB(o){return Math.max(o,Math.min(o+2,6))}
+function limits(r){var p=[],n=function(a){return(a||[]).length},L=r.layout||{},used={},bad=false;
+ if(L.summary){var w=wc(r.summary);if(w<40||w>60)p.push('summary is '+w+' words, must be 40-60')}
+ var chk=function(a){(a||[]).forEach(function(i){if(typeof i!=='number'||i<0||i>=S.paras.length||used[i])bad=true;used[i]=1})};
+ chk((L.summary||{}).paras);chk((L.skills||{}).paras);chk((L.projects||{}).paras);
+ (r.roles||[]).forEach(function(ro,i){chk(ro.paras);var o=n(ro.paras),b=n(ro.bullets),nm=ro.company||ro.title||('role '+(i+1));
+  if(o&&b>capB(o))p.push(nm+' has '+b+' bullets but the resume has '+o+'; at most '+capB(o)+' are allowed');else if(o&&b<Math.min(3,o))p.push(nm+' has '+b+' bullets, keep at least '+Math.min(3,o))});
+ if(bad)p.push('layout paragraph indexes are out of range or used twice');
+ var mp=maxProj(r);if(L.projects){if(n(r.projects)>mp)p.push('at most '+mp+' project'+(mp===1?'':'s'));if(!n(r.projects))p.push('keep at least 1 project');(r.projects||[]).forEach(function(x){if(n(x.bullets)<1||n(x.bullets)>2)p.push('project '+x.name+' has '+n(x.bullets)+' bullets, must be 1-2')})}
+ return p}
+$('br').onclick=async function(){if(!need())return;
+  $('br').disabled=true;$('bs').disabled=true;resetOut('Rewriting your resume',true);if(S.an)renderAn();
+ try{try{await scanEvidence();renderAn()}catch(e){}var r=await ask(rwPrompt(''),'Rewriting'),pr=limits(r);if(pr.length){r=await ask(rwPrompt(pr.join('; ')),'Fixing section limits');pr=limits(r)}
+  S.limitProblems=pr;var eng=!!(window.ENGINE&&S.an&&S.an.engine&&S.an.engine.indexOf('Scoring engine')===0);
+  var measure=async function(x){await loadResume();apply(x);if(eng){$('status').textContent='Re-scoring the updated resume…';try{await ENGINE.after(x,liveText())}catch(e){eng=false}}};
+  await measure(r);
+  var bsc={};Object.keys(WT).forEach(function(k){bsc[k]=Math.round(+S.an.factors[k].score||0)});var bov=overall(bsc),aov=function(x){return x.after_scores?overall(x.after_scores):0};
+  if(eng&&((r.lost_keywords||[]).length||aov(r)<bov)){try{var lost=(r.lost_keywords||[]).slice(),fb='The measured match of your rewrite is '+aov(r)+'% against '+bov+'% for the original resume.'+(lost.length?' You dropped these JD keywords that the current resume already contains: '+lost.join(', ')+'. Put each one back.':'')+' Use the ATS TARGETS list: add every ADD term that the sources truthfully support, especially in the skills line, and keep every other rule.',
+   r2=await ask(rwPrompt(fb),'Improving the match'),p2=limits(r2);
+   if(!p2.length){await measure(r2);if(aov(r2)>=aov(r)){r=r2;pr=p2;S.limitProblems=p2}else await measure(r)}else await measure(r)}catch(e){await measure(r)}}
+  S.rw=r;await loadResume();apply(r);$('status').textContent='';$('dd').disabled=false;$('dp').disabled=false;renderAn();renderAll()}
+ catch(e){$('t-res').innerHTML='<div class="empty"><b>Rewrite did not finish</b><p class="mute">Try again.</p></div>';$('status').innerHTML='<span class="err">'+esc(e.message||e.code||'Failed')+'</span>'}$('br').disabled=false;$('bs').disabled=false};
+
+/* ---------- docx editing: clone original paragraphs, bold key terms ---------- */
+function segs(text,terms){var T=(terms||[]).filter(Boolean).map(function(t){return String(t).trim()}).filter(Boolean).sort(function(a,b){return b.length-a.length}).map(function(t){return t.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')});
+ var src=(T.length?'(?<![\\w])(?:'+T.join('|')+')(?![\\w])|':'')+'\\$?\\d[\\d,]*(?:\\.\\d+)?(?:\\s?(?:%|\\+|(?:k|x|hrs?|mins?)(?![A-Za-z])))?',re=new RegExp(src,'gi'),out=[],i=0,m;
+ while((m=re.exec(text))){if(m.index>i)out.push({t:text.slice(i,m.index),b:0});out.push({t:m[0],b:1});i=m.index+m[0].length}if(i<text.length)out.push({t:text.slice(i),b:0});return out}
+function setBold(r,on){var rp=null;for(var c=r.firstElementChild;c;c=c.nextElementSibling)if(c.localName==='rPr')rp=c;
+ if(!rp){if(!on)return;rp=r.ownerDocument.createElementNS(NS,'w:rPr');r.insertBefore(rp,r.firstChild)}
+ var b=null;for(var c2=rp.firstElementChild;c2;c2=c2.nextElementSibling)if(c2.localName==='b')b=c2;
+ if(on){if(b){b.removeAttributeNS(NS,'val');b.removeAttribute('w:val')}else{b=r.ownerDocument.createElementNS(NS,'w:b');var at=rp.firstChild;while(at&&(at.localName==='rStyle'||at.localName==='rFonts'))at=at.nextSibling;rp.insertBefore(b,at)}}else if(b)rp.removeChild(b)}
+function put(r,t){var ts=tg(r,'t');ts[0].textContent=t;ts[0].setAttribute('xml:space','preserve');ts.slice(1).forEach(function(x){x.remove()})}
+var HL='http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink';
+function addLink(p,url,label){if(!url||!S.relDoc)return;var rd=S.relDoc,root=rd.documentElement,n=1;Array.prototype.forEach.call(rd.getElementsByTagName('Relationship'),function(r){var m=/^rId(\d+)$/.exec(r.getAttribute('Id')||'');if(m&&+m[1]>=n)n=+m[1]+1});
+ var id='rId'+n,rel=rd.createElementNS(root.namespaceURI,'Relationship');rel.setAttribute('Id',id);rel.setAttribute('Type',HL);rel.setAttribute('Target',url);rel.setAttribute('TargetMode','External');root.appendChild(rel);
+ var runs=tg(p,'r'),base=runs.length?runs[0].cloneNode(true):p.ownerDocument.createElementNS(NS,'w:r');tg(base,'t').forEach(function(x){x.remove()});
+ var rp=null;for(var c=base.firstElementChild;c;c=c.nextElementSibling)if(c.localName==='rPr')rp=c;if(!rp){rp=p.ownerDocument.createElementNS(NS,'w:rPr');base.insertBefore(rp,base.firstChild)}
+ Array.prototype.slice.call(rp.children).forEach(function(x){if(['b','bCs','color','u'].indexOf(x.localName)>=0)rp.removeChild(x)});
+ var col=p.ownerDocument.createElementNS(NS,'w:color');col.setAttributeNS(NS,'w:val','0563C1');rp.appendChild(col);var u=p.ownerDocument.createElementNS(NS,'w:u');u.setAttributeNS(NS,'w:val','single');rp.appendChild(u);
+ var t=p.ownerDocument.createElementNS(NS,'w:t');t.textContent=label||'Link';base.appendChild(t);
+ var h=p.ownerDocument.createElementNS(NS,'w:hyperlink');h.setAttributeNS(RNS,'r:id',id);h.setAttribute('w:history','1');h.appendChild(base);p.appendChild(h)}
+function setText(p,text,delim,terms,link){var runs=tg(p,'r').filter(function(r){return tg(r,'t').length});if(!runs.length)return;var keep=[],k=delim?text.indexOf(delim):-1;
+ if(delim&&runs.length>1&&k>0){var cut=delim===':'?k+1:k;put(runs[0],text.slice(0,cut)+(delim===':'?' ':''));put(runs[1],text.slice(cut).replace(/^\s+/,delim===':'?'':' '));keep=[runs[0],runs[1]]}
+ else if(terms){var par=runs[0].parentNode,base=runs[0].cloneNode(true);segs(text,terms).forEach(function(s){var r=base.cloneNode(true);put(r,s.t);setBold(r,s.b);par.insertBefore(r,runs[0])})}
+ else{put(runs[0],text);keep=[runs[0]]}
+ runs.forEach(function(r){if(keep.indexOf(r)<0)r.parentNode&&r.parentNode.removeChild(r)});tg(p,'hyperlink').forEach(function(h){if(!tg(h,'r').length)h.remove()});
+ if(link)addLink(p,link,'Link')}
+function replaceSection(idxs,items){if(!idxs||!idxs.length||!S.paras[idxs[0]])return;var first=S.paras[idxs[0]],par=first.parentNode;
+ items.forEach(function(it){var tpl=S.paras[it.tpl]||first,c=tpl.cloneNode(true);setText(c,it.text,it.delim,it.terms,it.link);par.insertBefore(c,first)});
+ idxs.forEach(function(i){var p=S.paras[i];if(p&&p.parentNode)p.parentNode.removeChild(p)})}
+function projTitle(p){return p.name+(p.tools?' | '+p.tools:'')+(p.link?' | ':'')}
+function apply(r){var L=r.layout||{},T=r.bold_terms||[],sec=function(o,arr,delim,terms){if(o&&o.paras&&arr)replaceSection(o.paras,arr.map(function(t){return{tpl:o.tpl,text:t,delim:delim,terms:terms}}))};
+ if(r.summary)sec(L.summary,[r.summary],null,T);(r.roles||[]).forEach(function(ro){sec(ro,ro.bullets,null,T)});sec(L.skills,r.skills,':',null);var P=L.projects;
+ if(P&&P.paras){var it=[];(r.projects||[]).forEach(function(p){it.push({tpl:P.titleTpl,text:projTitle(p),delim:' | ',link:p.link});(p.bullets||[]).forEach(function(b){it.push({tpl:P.bulletTpl,text:b,terms:T})})});replaceSection(P.paras,it)}}
+
+/* ---------- right pane ---------- */
+var norm=function(s){return String(s||'').toLowerCase().replace(/\s+/g,' ').trim()};
+function emph(t){return segs(t,S.rw.bold_terms).map(function(s){return s.b?'<b>'+esc(s.t)+'</b>':esc(s.t)}).join('')}
+function hl(t,k){var h=esc(t);(k||[]).forEach(function(w){if(!w)return;var e=esc(w).replace(/[.*+?^${}()|[\]\\]/g,'\\$&');h=h.replace(new RegExp('('+e+')','ig'),'<mark>$1</mark>')});return h}
+var AC={reorder:['Reordered','pill ac'],keep:['Kept','pill'],rewrite:['Rewritten','pill ac'],add:['Added','pill ok'],remove:['Removed','pill bd']};
+function badge(c){var a=AC[c&&c.action]||['Updated','pill ac'];return '<span class="'+a[1]+'">'+a[0]+'</span>'}
+function why(c){if(!c)return'';return '<div class="why2">'+badge(c)+'<div><i>What</i>'+esc(c.what)+'</div><div><i>Why</i>'+esc(c.why)+'</div><div><i>How</i>'+esc(c.how)+'</div>'+(c.order?'<div><i>Order</i>'+esc(c.order)+'</div>':'')+((c.keywords_added||[]).length?'<div style="margin-top:5px">'+c.keywords_added.map(function(k){return '<span class="pill wn">+ '+esc(k)+'</span> '}).join('')+'</div>':'')+'</div>'}
+function rowH(text,c,cls){return '<div class="rw2 '+(cls||'')+'"><div class="txt">'+(cls==='rm'?esc(text):emph(text))+'</div><div class="why2-wrap">'+why(c)+'</div></div>'}
+function unverified(){var src=(S.origText||'')+' '+$('up').value+' '+$('pj').value+' '+Object.keys(S.notes).map(function(k){return S.notes[k]}).join(' '),r=S.rw,txt=[r.summary];(r.roles||[]).forEach(function(ro){txt=txt.concat(ro.bullets||[])});(r.projects||[]).forEach(function(p){txt=txt.concat(p.bullets||[])});var bad={};
+ txt.join(' ').replace(/\d[\d,]*(?:\.\d+)?\s?(?:%|\+)?/g,function(m){m=m.trim();if(m&&src.indexOf(m)<0)bad[m]=1});return Object.keys(bad)}
+function renderAll(){var r=S.rw,L=r.layout||{},u=unverified(),lp=S.limitProblems||[],m={},n=function(a){return(a||[]).length};(r.changes||[]).forEach(function(c){if(c.after)m[norm(c.after)]=c});
+ var secs=function(p){return(r.changes||[]).filter(function(c){var s=norm(c.section);return p.some(function(x){return s.indexOf(x)===0})})};
+ var top='<div class="row" style="gap:6px;margin-bottom:10px">'+(L.summary?chip('Summary '+wc(r.summary)+' words',wc(r.summary)>=40&&wc(r.summary)<=60):'')+(r.roles||[]).map(function(ro){var o=n(ro.paras);return chip((ro.company||ro.title||'Role')+': '+n(ro.bullets)+' of '+o+' bullets',n(ro.bullets)<=capB(o)&&n(ro.bullets)>=Math.min(3,o))}).join('')+(L.projects?chip(n(r.projects)+' project'+(n(r.projects)===1?'':'s'),n(r.projects)<=maxProj(r)):'')+(u.length?'':'<span class="pill ok">All numbers match your sources</span>')+'<label class="mute" style="margin-left:auto"><input type="checkbox" id="rz" '+(S.reason?'checked':'')+'> Show reasoning</label></div>';
+ if(r.after_scores&&S.an){var _b={};Object.keys(WT).forEach(function(k){_b[k]=Math.round(+S.an.factors[k].score||0)});if(overall(r.after_scores)<overall(_b))top+='<div class="verdict bad"><b>This rewrite scores lower than your original ('+overall(r.after_scores)+'% against '+overall(_b)+'%).</b> Do not use it as it is. Select Rewrite again, or keep your original wording for the sections that lost keywords.</div>'}
+ if((r.lost_keywords||[]).length)top+='<div class="verdict warn"><b>Keywords the rewrite dropped</b><div>These matched your original resume but are missing now: '+r.lost_keywords.map(function(x){return '<span class="pill wn">'+esc(x)+'</span>'}).join(' ')+' Add them back by hand only if they are true.</div></div>';
+ if(lp.length)top+='<div class="verdict bad">Limits not met: '+esc(lp.join('; '))+'</div>';
+ if(u.length)top+='<div class="verdict warn"><b>Check these numbers</b><div>Not found in your sources: '+u.map(function(x){return '<span class="pill wn">'+esc(x)+'</span>'}).join(' ')+' Confirm they are real or remove them before sending.</div></div>';
+ var h=top+'<div id="rs" class="rs2 '+(S.reason?'':'noreason')+'">';
+ h+=L.summary?'<div class="card sec"><h3>Professional Summary <span class="pill">'+wc(r.summary)+' words</span></h3>'+rowH(r.summary,secs(['summary','professional'])[0])+'</div>':'<div class="card sec mute">No summary section was found on your resume, so none was added.</div>';
+ h+='<div class="card sec"><h3>Experience</h3>'+(r.roles||[]).map(function(ro){var rm=secs(['experience: '+norm(ro.company||ro.title||'')]).filter(function(c){return c.action==='remove'});
+  return '<div style="margin-top:10px"><b>'+esc(ro.title||'')+(ro.title&&ro.company?', ':'')+esc(ro.company||'')+'</b> <span class="pill">'+n(ro.bullets)+' of '+n(ro.paras)+' bullets</span>'+(ro.order_reason?'<div class="mute" style="font-size:12.5px">Order: '+esc(ro.order_reason)+'</div>':'')+'</div>'+(ro.bullets||[]).map(function(b){return rowH(b,m[norm(b)])}).join('')+rm.map(function(c){return rowH(c.before,c,'rm')}).join('')}).join('')+'</div>';
+ h+=L.projects?'<div class="card sec"><h3>Projects <span class="pill">'+n(r.projects)+' selected</span></h3>'+(r.projects||[]).map(function(p){return '<div style="margin-top:8px"><b>'+esc(p.name)+'</b>'+(p.tools?' <span class="mute">| '+esc(p.tools)+'</span>':'<span class="pill wn">no tools found</span>')+' '+(p.link?'<a href="'+esc(p.link)+'" target="_blank" rel="noopener" style="color:var(--acc);font-size:13px">Link</a>':'<span class="pill wn">no link in your sources</span>')+(p.order_reason?'<div class="mute" style="font-size:12.5px">Order: '+esc(p.order_reason)+'</div>':'')+'</div>'+(p.bullets||[]).map(function(b){return rowH(b,m[norm(b)])}).join('')}).join('')+'</div>':(hasProjFile()?'<div class="card sec mute">No projects section was found on your resume, so projects from your file were not added.</div>':'');
+ h+='<div class="card sec"><h3>Skills</h3><div class="rw2"><div class="txt">'+(r.skills||[]).map(function(s){var k=s.indexOf(':');return k>0?'<div><b>'+esc(s.slice(0,k+1))+'</b>'+esc(s.slice(k+1))+'</div>':'<div>'+esc(s)+'</div>'}).join('')+'</div><div class="why2-wrap">'+why(secs(['skills'])[0])+'</div></div></div></div>';
+ $('t-res').innerHTML=h;$('rz').onchange=function(){S.reason=this.checked;$('rs').classList.toggle('noreason',!this.checked)};
+ var c='<p class="mute">Original next to the new text. Highlighted words come from the job description.</p>';
+ (r.changes||[]).forEach(function(x){c+='<div class="card sec"><h3>'+esc(x.section)+' '+badge(x)+'</h3><div class="cmp"><div><div class="mute">Before</div>'+esc(x.before||'(new bullet)')+'</div><div class="a"><div class="mute">After</div>'+(x.after?hl(x.after,x.keywords_added):'(removed)')+'</div></div><div class="why2" style="margin-top:8px"><div><i>What</i>'+esc(x.what)+'</div><div><i>Why</i>'+esc(x.why)+'</div><div><i>How</i>'+esc(x.how)+'</div>'+(x.order?'<div><i>Order</i>'+esc(x.order)+'</div>':'')+'<div class="mute"><i>Source</i>'+esc(x.source)+'</div></div></div>'});$('t-chg').innerHTML=c;
+ var k=r.keywords||[],bf=k.filter(function(x){return x.in_before}).length,af=k.filter(function(x){return x.in_after}).length,pc=function(v){return k.length?Math.round(v/k.length*100):0};
+ $('t-kw').innerHTML='<div class="card sec row" style="gap:36px"><div class="stat"><div class="big">'+pc(bf)+'%</div><div class="mute">JD keywords matched before</div></div><div class="stat"><div class="big" style="color:var(--ok)">'+pc(af)+'%</div><div class="mute">matched after rewrite</div></div></div><div class="card sec"><table><tr><th>Keyword<div class="mute" style="font-weight:500">'+k.length+' total</div></th><th>Before<div class="mute" style="font-weight:500">'+bf+' matched</div></th><th>After<div class="mute" style="font-weight:500">'+af+' matched</div></th></tr>'+k.map(function(x){return '<tr><td>'+esc(x.kw)+'</td><td>'+(x.in_before?'<span class="pill ok">Yes</span>':'<span class="pill bd">No</span>')+'</td><td>'+(x.in_after?'<span class="pill ok">Yes</span>':'<span class="pill wn">No</span>')+'</td></tr>'}).join('')+'</table></div>'+((r.lost_keywords||[]).length?'<p class="mute"><b>Lost in rewrite:</b> '+r.lost_keywords.map(function(x){return '<span class="pill wn">'+esc(x)+'</span>'}).join(' ')+'</p>':'')+'<p class="mute">Keywords still missing need real experience. Add them only once you have it.</p>'}
+function chip(t,ok){return '<span class="pill '+(ok?'ok':'bd')+'">'+esc(t)+'</span>'}
+
+/* ---------- downloads ---------- */
+$('dd').onclick=async function(){try{var x=new XMLSerializer().serializeToString(S.doc);if(x.indexOf('<?xml')!==0)x='<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n'+x;S.zip.file('word/document.xml',x);if(S.relDoc)S.zip.file('word/_rels/document.xml.rels',new XMLSerializer().serializeToString(S.relDoc));
+ var blob=await S.zip.generateAsync({type:'blob',mimeType:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'});await save(fileBase()+'.docx',blob)}catch(e){fail(e)}};
+$('dp').onclick=async function(){try{var J=window.jspdf.jsPDF,d=new J({unit:'pt',format:'a4'}),M=42,PW=d.internal.pageSize.getWidth()-2*M,y=44,cl=function(s){return s.replace(/[\u2013\u2014]/g,'-').replace(/[\u2018\u2019]/g,"'").replace(/[\u201C\u201D]/g,'"').replace(/[\u2022\u25CF\u25AA]/g,'-').replace(/[^\x00-\xFF]/g,'')};
+ tg(S.doc,'p').forEach(function(p){var toks=[],sz=10.5,bl=tg(p,'numPr').length>0;
+  tg(p,'r').forEach(function(r){var t=cl(tg(r,'t').map(function(x){return x.textContent}).join(''));if(!t)return;var s=tg(r,'sz')[0];if(s&&!toks.length)sz=Math.min(16,+s.getAttribute('w:val')/2||10.5);var b=tg(r,'b')[0],v=b&&b.getAttribute('w:val'),bold=!!b&&v!=='0'&&v!=='false';t.split(/(\s+)/).forEach(function(w){if(w)toks.push({w:w,b:bold})})});
+  if(!toks.length){y+=4;return}if(y>800){d.addPage();y=44}var x0=M+(bl?10:0),x=x0;if(bl){d.setFont('helvetica','normal');d.setFontSize(sz);d.text('-',M,y)}
+  toks.forEach(function(k){d.setFont('helvetica',k.b?'bold':'normal');d.setFontSize(sz);var w=d.getTextWidth(k.w);if(x+w>M+PW&&k.w.trim()){x=x0;y+=sz*1.3;if(y>800){d.addPage();y=44}}if(!(x===x0&&!k.w.trim())){d.text(k.w,x,y);x+=w}});y+=sz*1.3+2});
+ await save(fileBase()+'.pdf',d.output('blob'))}catch(e){fail(e)}};
+function clean(s,max){return String(s||'').replace(/[\\/:*?"<>|]+/g,' ').replace(/\s+/g,' ').trim().replace(/ /g,'_').replace(/^_+|_+$/g,'').slice(0,max||40)}
+function guessName(){var t=String((S.origText||'').split('\n')[0]||'').trim();return t&&t.split(/\s+/).length<=5?t:''}
+function fileBase(){var m=(S.rw&&S.rw.meta)||{},parts=[clean(m.name||guessName(),40)||'Name','Resume'],co=clean(m.company,30),ro=clean(m.role||(S.an&&S.an.role),40);if(co)parts.push(co);parts.push(ro||'Role');return parts.join('_')}
+async function save(n,b){if(!S.dl){$('status').innerHTML='<span class="err">Downloads need this page opened in claude.ai.</span>';return}await S.dl.save({filename:n,data:b})}
+function fail(e){if(e&&e.code==='declined')return;$('status').innerHTML='<span class="err">'+esc(e.message||e.code||'Download failed')+'</span>'}
+
+(function(){var R=window.__ro,gk=document.getElementById('gk'),gm=document.getElementById('gm'),gr=document.getElementById('gr'),gs=document.getElementById('gs'),st=document.getElementById('keyst'),box=document.getElementById('aiset'),kb=document.getElementById('keybox');
+ function show(){if(R.useProxy){st.textContent='Ready';st.className='pill ok';kb.hidden=true;return}var has=!!R.get(R.KEY);st.textContent=has?'Key saved':'Key needed';st.className='pill '+(has?'ok':'wn');if(!has)box.open=true}
+ function fill(list){var cur=R.get(R.MODEL);if(/2\.5|1\.5|2\.0/.test(cur)){cur='';R.set(R.MODEL,'')}if(!list.length)return;
+  gm.innerHTML=list.map(function(m){return'<option value="'+m.id+'">'+m.id+'</option>'}).join('');
+  if(!cur||!list.some(function(m){return m.id===cur})){cur=list[0].id;R.set(R.MODEL,cur)}gm.value=cur}
+ async function load(){if(!R.useProxy&&!R.get(R.KEY)){gs.textContent='';return}gs.textContent=' Loading models…';try{fill(await R.discover());gs.textContent=' Models loaded.'}catch(e){gs.textContent=' '+e.message}}
+ R.refresh=function(){var c=R.get(R.MODEL);if(c&&!Array.prototype.some.call(gm.options,function(o){return o.value===c})){var o=document.createElement('option');o.value=c;o.textContent=c;gm.appendChild(o)}gm.value=c};
+ gk.value=R.get(R.KEY);var m0=R.get(R.MODEL);if(/2\.5|1\.5|2\.0/.test(m0))R.set(R.MODEL,'');gm.value=R.get(R.MODEL)||'gemini-3.8-flash';show();
+ var t;gk.oninput=function(){R.set(R.KEY,gk.value.trim());show();clearTimeout(t);t=setTimeout(load,700)};
+ gm.onchange=function(){R.set(R.MODEL,gm.value)};gr.onclick=load;load()})();
+</script>
+<div class="mute" style="text-align:center;font-size:11px;padding:10px 0">v0.8.1</div>
+</body>
+</html>
