@@ -77,7 +77,7 @@ table{border-collapse:collapse;width:100%;font-size:13px}td,th{border-bottom:1px
     <summary><span class="sumt">AI settings</span><span id="keyst" class="pill"></span><span class="edit"></span></summary>
     <div class="ig"><div class="in">
       <label for="gp" class="mute" style="display:block">AI provider</label>
-      <select id="gp" style="margin:4px 0 8px;max-width:100%;border:1px solid var(--rule);border-radius:8px;padding:7px;background:var(--panel);color:var(--ink);font:inherit"><option value="cerebras">Cerebras (free and very fast)</option><option value="openrouter">OpenRouter (paid models)</option><option value="gemini">Google Gemini</option></select>
+      <select id="gp" style="margin:4px 0 8px;max-width:100%;border:1px solid var(--rule);border-radius:8px;padding:7px;background:var(--panel);color:var(--ink);font:inherit"><option value="mistral">Mistral (free, no card, recommended)</option><option value="cerebras">Cerebras (may ask for payment)</option><option value="openrouter">OpenRouter (paid models)</option><option value="gemini">Google Gemini</option></select>
       <div id="keybox"><b><label for="gk" id="gkl">OpenRouter API key</label></b>
       <input id="gk" type="password" autocomplete="off" spellcheck="false" placeholder="Paste your key from openrouter.ai/keys" style="width:100%;margin:6px 0 8px;border:1px solid var(--rule);border-radius:8px;padding:8px;font:13px ui-monospace,Consolas,monospace;background:var(--panel);color:var(--ink)"></div>
       <label for="gm" class="mute" style="display:block">Model</label>
@@ -114,7 +114,7 @@ table{border-collapse:collapse;width:100%;font-size:13px}td,th{border-bottom:1px
  var get=function(k){try{return localStorage.getItem(k)||''}catch(e){return''}},set=function(k,v){try{localStorage.setItem(k,v)}catch(e){}};
  var sleep=function(ms){return new Promise(function(r){setTimeout(r,ms)})};
  var useProxy=!!window.__proxyOverride||!/YOUR-WORKER/.test(PROXY);
- var prov=function(){var p=get(PROV);return p==='gemini'||p==='cerebras'||p==='openrouter'?p:'cerebras'};
+ var prov=function(){var p=get(PROV);return p==='gemini'||p==='cerebras'||p==='openrouter'||p==='mistral'?p:'mistral'};
  function parse(t){t=String(t||'').replace(/^\s*```(?:json)?/i,'').replace(/```\s*$/,'').trim();try{return JSON.parse(t)}catch(e){var a=t.indexOf('{'),b=t.lastIndexOf('}');if(a>=0&&b>a)return JSON.parse(t.slice(a,b+1));throw Error('The AI reply was not valid JSON. Please try again.')}}
  /* ---------- Gemini ---------- */
  var GBASE=function(){return useProxy?(window.__proxyOverride||PROXY)+'/v1beta/':'https://generativelanguage.googleapis.com/v1beta/'};
@@ -177,38 +177,42 @@ table{border-collapse:collapse;width:100%;font-size:13px}td,th{border-bottom:1px
     if(res.status===429||res.status>=500||res.status===408){if(a===0){await sleep(3000);continue}}
     break}}
   throw Error('OpenRouter could not return a complete answer ('+why.slice(0,3).join('; ')+'). Try again, pick another model, or use a paid model for the most reliable results.')}
- /* ---------- Cerebras (free, very fast) ---------- */
- var CBASE=function(){return useProxy?(window.__proxyOverride||PROXY)+'/cerebras/v1/':'https://api.cerebras.ai/v1/'};
- var ch=function(h){var k=get(CKEY);if(!useProxy&&k)h['Authorization']='Bearer '+k;return h};
- var CB_MODELS=[{id:'gpt-oss-120b',label:'gpt-oss-120b (free, very fast)'},{id:'qwen-3.8-27b',label:'qwen-3.8-27b (free, very fast)'}];
- async function cdiscover(){if(!useProxy&&!get(CKEY))return CB_MODELS;try{var res=await fetch(CBASE()+'models',{headers:ch({})});if(!res.ok)return CB_MODELS;var d=(await res.json()).data||[],ids=d.map(function(m){return m.id});var l=CB_MODELS.filter(function(m){return ids.indexOf(m.id)>=0});return l.length?l:CB_MODELS}catch(e){return CB_MODELS}}
- async function cjson(prompt,opts){
-  if(!useProxy&&!get(CKEY))throw Error('Add your Cerebras API key under "AI settings" first.');
-  var queue=[get(CMODEL)||'gpt-oss-120b'];CB_MODELS.forEach(function(m){if(queue.indexOf(m.id)<0)queue.push(m.id)});var why=[];
+ /* ---------- OpenAI-compatible free providers: Mistral, Cerebras ---------- */
+ var CFG={
+  mistral:{name:'Mistral',url:'https://api.mistral.ai/v1/',path:'/mistral/v1/',key:'ro_mi_key',model:'ro_mi_model',def:'mistral-small-latest',max:'max_tokens',models:[{id:'mistral-small-latest',label:'mistral-small-latest (free, fast)'},{id:'mistral-medium-latest',label:'mistral-medium-latest (free, stronger)'},{id:'mistral-large-latest',label:'mistral-large-latest (free, strongest, slower)'}],wait:'Mistral free limits are 1 request a second.'},
+  cerebras:{name:'Cerebras',url:'https://api.cerebras.ai/v1/',path:'/cerebras/v1/',key:'ro_cb_key',model:'ro_cb_model',def:'gpt-oss-120b',max:'max_completion_tokens',models:[{id:'gpt-oss-120b',label:'gpt-oss-120b (very fast)'},{id:'qwen-3.8-27b',label:'qwen-3.8-27b (very fast)'}],wait:'Cerebras limits are 5 requests a minute.'}};
+ var cbase=function(c){return useProxy?(window.__proxyOverride||PROXY)+c.path:c.url};
+ var chd=function(c,h){var k=get(c.key);if(!useProxy&&k)h['Authorization']='Bearer '+k;return h};
+ async function cdiscover(){var c=CFG[prov()];if(!useProxy&&!get(c.key))return c.models;try{var res=await fetch(cbase(c)+'models',{headers:chd(c,{})});if(!res.ok)return c.models;var d=(await res.json()).data||[],ids=d.map(function(m){return m.id}),dflt=c.models.map(function(m){return m.id});
+   var l=c.models.filter(function(m){return ids.indexOf(m.id)>=0});return l.length?l:c.models}catch(e){return c.models}}
+ async function cjson(prompt,opts){var c=CFG[prov()];
+  if(!useProxy&&!get(c.key))throw Error('Add your '+c.name+' API key under "AI settings" first.');
+  var queue=[get(c.model)||c.def];c.models.forEach(function(m){if(queue.indexOf(m.id)<0)queue.push(m.id)});var why=[];
   for(var qi=0;qi<queue.length;qi++){var model=queue[qi],useRF=true;
    for(var a=0;a<5;a++){
-    var body={model:model,messages:[{role:'user',content:prompt}],temperature:0.2,max_completion_tokens:16000};if(useRF)body.response_format={type:'json_object'};
-    var res;try{res=await fetch(CBASE()+'chat/completions',{method:'POST',headers:ch({'Content-Type':'application/json'}),body:JSON.stringify(body)})}catch(e){throw Error('Could not reach Cerebras from the browser ('+(e.message||'network error')+'). If this keeps happening, the site owner can route it through the server (see README).')}
+    var body={model:model,messages:[{role:'user',content:prompt}],temperature:0.2};body[c.max]=16000;if(useRF)body.response_format={type:'json_object'};
+    var res;try{res=await fetch(cbase(c)+'chat/completions',{method:'POST',headers:chd(c,{'Content-Type':'application/json'}),body:JSON.stringify(body)})}catch(e){throw Error('Could not reach '+c.name+' from the browser ('+(e.message||'network error')+'). If this keeps happening, the site owner can route it through the server (see README).')}
     var d=null;try{d=await res.json()}catch(e){}
-    var emsg=d&&d.message?d.message:(d&&d.error?(d.error.message||JSON.stringify(d.error)):'');
-    if(res.status===401||res.status===403)throw Error('Cerebras rejected the key ('+res.status+'). '+(useProxy?'The site owner needs to check the server setup.':'Check that your API key is correct.'));
+    var emsg=d&&typeof d.message==='string'?d.message:(d&&d.error?(d.error.message||JSON.stringify(d.error)):'');
+    if(res.status===401||res.status===403)throw Error(c.name+' rejected the key ('+res.status+'). '+(useProxy?'The site owner needs to check the server setup.':'Check that your API key is correct and that your account is activated.'));
+    if(res.status===402)throw Error(c.name+' is asking for payment on this account. Pick another provider under AI settings.');
     if(res.status===400&&useRF){useRF=false;continue}
     if(res.status===404){why.push(model+': not available');break}
-    if(res.status===429){if(opts&&opts.onText){}await sleep(8000+4000*a);continue}
+    if(res.status===429){await sleep(4000+4000*a);continue}
     if(res.status>=500){await sleep(3000);continue}
-    if(res.ok&&!emsg){var c=(d.choices||[])[0],text=otext(c);
-     if(c&&c.finish_reason==='length'){why.push(model+': reply cut off');break}
+    if(res.ok&&!emsg){var ch=(d.choices||[])[0],text=otext(ch);
+     if(ch&&ch.finish_reason==='length'){why.push(model+': reply cut off');break}
      if(!text.trim()){why.push(model+': empty reply');break}
      var out;try{out=parse(text)}catch(e){why.push(model+': not valid JSON');break}
      window.__ro.lastModel=model;if(opts&&opts.onText)opts.onText({text:text});return out}
     why.push(model+': '+(res.status||'')+(emsg?' '+emsg.slice(0,80):''));break}}
-  throw Error('Cerebras could not return a complete answer ('+why.slice(0,3).join('; ')+'). Free limits are 5 requests a minute and 1M tokens a day, so wait a minute and try again.')}
+  throw Error(c.name+' could not return a complete answer ('+why.slice(0,3).join('; ')+'). '+c.wait+' Wait a minute and try again.')}
  /* ---------- dispatch ---------- */
- async function json(prompt,opts){var p=prov();return p==='gemini'?gjson(prompt,opts):p==='cerebras'?cjson(prompt,opts):ojson(prompt,opts)}
- async function discover(){var p=prov();return p==='gemini'?gdiscover():p==='cerebras'?cdiscover():odiscover()}
+ async function json(prompt,opts){var p=prov();return p==='gemini'?gjson(prompt,opts):(p==='cerebras'||p==='mistral')?cjson(prompt,opts):ojson(prompt,opts)}
+ async function discover(){var p=prov();return p==='gemini'?gdiscover():(p==='cerebras'||p==='mistral')?cdiscover():odiscover()}
  var dl={save:async function(o){var u=URL.createObjectURL(o.data),a=document.createElement('a');a.href=u;a.download=o.filename;document.body.appendChild(a);a.click();a.remove();setTimeout(function(){URL.revokeObjectURL(u)},4000)}};
  window.claude={use:async function(n){if(n==='sample')return{json:json};if(n==='downloads')return dl;throw Error('Unknown helper '+n)}};
- window.__ro={get:get,set:set,PROV:PROV,prov:prov,kn:function(){var p=prov();return p==='gemini'?GKEY:p==='cerebras'?CKEY:OKEY},mn:function(){var p=prov();return p==='gemini'?GMODEL:p==='cerebras'?CMODEL:OMODEL},defModel:function(){var p=prov();return p==='gemini'?'gemini-3.8-flash':p==='cerebras'?'gpt-oss-120b':DEFAULT_OR},discover:discover,useProxy:useProxy};
+ window.__ro={get:get,set:set,PROV:PROV,prov:prov,kn:function(){var p=prov();return CFG[p]?CFG[p].key:p==='gemini'?GKEY:OKEY},mn:function(){var p=prov();return CFG[p]?CFG[p].model:p==='gemini'?GMODEL:OMODEL},defModel:function(){var p=prov();return CFG[p]?CFG[p].def:p==='gemini'?'gemini-3.8-flash':DEFAULT_OR},discover:discover,useProxy:useProxy};
 })();
 </script>
 <script>
@@ -588,7 +592,7 @@ async function save(n,b){if(!S.dl){$('status').innerHTML='<span class="err">Down
 function fail(e){if(e&&e.code==='declined')return;$('status').innerHTML='<span class="err">'+esc(e.message||e.code||'Download failed')+'</span>'}
 
 (function(){var R=window.__ro,gp=document.getElementById('gp'),gk=document.getElementById('gk'),gkl=document.getElementById('gkl'),gm=document.getElementById('gm'),gr=document.getElementById('gr'),gs=document.getElementById('gs'),st=document.getElementById('keyst'),box=document.getElementById('aiset'),kb=document.getElementById('keybox');
- var T={cerebras:['Cerebras API key (free)','Paste your key from cloud.cerebras.ai'],openrouter:['OpenRouter API key','Paste your key from openrouter.ai/keys'],gemini:['Gemini API key (free)','Paste your key from aistudio.google.com/apikey']};
+ var T={mistral:['Mistral API key (free)','Paste your key from console.mistral.ai'],cerebras:['Cerebras API key','Paste your key from cloud.cerebras.ai'],openrouter:['OpenRouter API key','Paste your key from openrouter.ai/keys'],gemini:['Gemini API key (free)','Paste your key from aistudio.google.com/apikey']};
  function show(){if(R.useProxy){st.textContent='Ready';st.className='pill ok';kb.hidden=true;return}var has=!!R.get(R.kn());st.textContent=has?'Key saved':'Key needed';st.className='pill '+(has?'ok':'wn');if(!has)box.open=true}
  function opts(list){var g={},out='';list.forEach(function(m){var k=m.group||'';(g[k]=g[k]||[]).push(m)});Object.keys(g).forEach(function(k){var h=g[k].map(function(m){return'<option value="'+m.id+'">'+m.label+'</option>'}).join('');out+=k?'<optgroup label="'+k+'">'+h+'</optgroup>':h});return out}
  function fill(list){var cur=R.get(R.mn());if(R.prov()==='gemini'&&/2\.5|1\.5|2\.0/.test(cur)){cur='';R.set(R.mn(),'')}if(!list.length)return;
@@ -602,6 +606,6 @@ function fail(e){if(e&&e.code==='declined')return;$('status').innerHTML='<span c
  gp.onchange=function(){R.set(R.PROV,gp.value);paint();gs.textContent='';load()};
  gm.onchange=function(){R.set(R.mn(),gm.value)};gr.onclick=load;load()})();
 </script>
-<div class="mute" style="text-align:center;font-size:11px;padding:10px 0">v0.10</div>
+<div class="mute" style="text-align:center;font-size:11px;padding:10px 0">v0.11</div>
 </body>
 </html>
