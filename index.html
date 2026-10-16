@@ -110,7 +110,7 @@ table{border-collapse:collapse;width:100%;font-size:13px}td,th{border-bottom:1px
  var GKEY='ro_gemini_key',GMODEL='ro_gemini_model',PROV='ro_provider',OKEY='ro_or_key',OMODEL='ro_or_model',CKEY='ro_cb_key',CMODEL='ro_cb_model';
  /* Set this to your Cloudflare Worker URL (no trailing slash) to keep the AI keys on a server instead of in each visitor's browser. */
  var PROXY='https://YOUR-WORKER.YOUR-SUBDOMAIN.workers.dev';
- var DEFAULT_OR='anthropic/claude-haiku-5.5',FALLBACK_OR=['thinkingmachines/inkling:free','nvidia/nemotron-3-super-120b-a12b:free','openrouter/free'];
+ var DEFAULT_OR='openrouter/free',FALLBACK_OR=['thinkingmachines/inkling:free','nvidia/nemotron-3-super-120b-a12b:free','openrouter/free'];
  var get=function(k){try{return localStorage.getItem(k)||''}catch(e){return''}},set=function(k,v){try{localStorage.setItem(k,v)}catch(e){}};
  var sleep=function(ms){return new Promise(function(r){setTimeout(r,ms)})};
  var useProxy=!!window.__proxyOverride||!/YOUR-WORKER/.test(PROXY);
@@ -152,12 +152,12 @@ table{border-collapse:collapse;width:100%;font-size:13px}td,th{border-bottom:1px
   var rank=function(id){for(var i=0;i<PREF.length;i++)if(PREF[i].test(id))return i;return 99};
   var free=ok.filter(function(m){return isFree(m)&&!BAD.test(m.id)}).sort(function(a,b){return rank(a.id)-rank(b.id)||(b.context_length||0)-(a.context_length||0)}).map(function(m){return{id:m.id,label:m.id.replace(/:free$/,'')+' (free, '+Math.round((m.context_length||0)/1000)+'K)',group:'Free models'}});
   var paid=PAID.filter(function(id){return ok.some(function(m){return m.id===id})}).map(function(id){return{id:id,label:id+' (paid, about a few cents per resume)',group:'Paid (recommended: fast, complete answers)'}});
-  var list=paid.concat(free);window.__orList=list;return list}
+  var list=free.concat(paid);window.__orList=list;return list}
  function otext(c){var t=c&&c.message&&c.message.content;if(Array.isArray(t))t=t.map(function(p){return p.text||''}).join('');return String(t||'')}
  async function ojson(prompt,opts){
   if(!useProxy&&!get(OKEY))throw Error('Add your OpenRouter API key under "AI settings" first.');
-  var chosen=get(OMODEL)||DEFAULT_OR,queue=[chosen];
-  if(/:free$|^openrouter\/free$/.test(chosen)){var pool=(window.__orList||[]).filter(function(m){return m.group==='Free models'}).map(function(m){return m.id});FALLBACK_OR.forEach(function(x){if(pool.indexOf(x)<0&&!(window.__orList||[]).length)pool.push(x)});pool.forEach(function(x){if(queue.indexOf(x)<0&&queue.length<4)queue.push(x)})}
+  var chosen=get(OMODEL)||DEFAULT_OR,queue=[chosen];if(queue.indexOf('openrouter/free')<0)FALLBACK_OR=FALLBACK_OR;
+  if(true){var pool=(window.__orList||[]).filter(function(m){return m.group==='Free models'}).map(function(m){return m.id});FALLBACK_OR.forEach(function(x){if(pool.indexOf(x)<0&&!(window.__orList||[]).length)pool.push(x)});pool.forEach(function(x){if(queue.indexOf(x)<0&&queue.length<4)queue.push(x)})}
   var why=[];
   for(var qi=0;qi<queue.length;qi++){var model=queue[qi],useRF=true;
    for(var a=0;a<2;a++){
@@ -165,8 +165,8 @@ table{border-collapse:collapse;width:100%;font-size:13px}td,th{border-bottom:1px
     var res;try{res=await fetch(OBASE()+'chat/completions',{method:'POST',headers:oh({'Content-Type':'application/json'}),body:JSON.stringify(body)})}catch(e){why.push(model+': network');break}
     var d=null;try{d=await res.json()}catch(e){}
     var emsg=d&&d.error?(d.error.message||JSON.stringify(d.error)):'';
-    if(res.status===401||res.status===403)throw Error('OpenRouter rejected the key ('+res.status+'). '+(useProxy?'The site owner needs to check the server setup.':'Check that your API key is correct.'));
-    if(res.status===402)throw Error('OpenRouter says this key has no credits for this model. Add a few dollars of credit at openrouter.ai/credits, or pick a free model (slower, with daily limits).');
+    if(res.status===401)throw Error('OpenRouter says the key is not valid (401). '+(emsg?emsg+'. ':'')+(useProxy?'The site owner needs to check the server setup.':'Check that the key is copied in full, with no spaces.'));
+    if(res.status===402||res.status===403){why.push(model+': '+res.status+' '+(emsg||'refused').slice(0,110));break}
     if(res.status===400&&useRF){useRF=false;a--;continue}
     if(res.ok&&!emsg){var c=(d.choices||[])[0],text=otext(c);
      if(c&&c.finish_reason==='length'){why.push(model+': reply cut off');break}
@@ -176,7 +176,7 @@ table{border-collapse:collapse;width:100%;font-size:13px}td,th{border-bottom:1px
     why.push(model+': '+(res.status||'')+(emsg?' '+emsg.slice(0,80):''));
     if(res.status===429||res.status>=500||res.status===408){if(a===0){await sleep(3000);continue}}
     break}}
-  throw Error('OpenRouter could not return a complete answer ('+why.slice(0,3).join('; ')+'). Try again, pick another model, or use a paid model for the most reliable results.')}
+  throw Error('OpenRouter could not return a complete answer ('+why.slice(0,4).join('; ')+'). '+(why.some(function(w){return/ 40[23] /.test(w)})?'If it mentions a data policy or privacy setting, open openrouter.ai/settings/privacy and allow free models, then try again. ':'')+'Try again or pick another model.')}
  /* ---------- OpenAI-compatible free providers: Mistral, Cerebras ---------- */
  var CFG={
   mistral:{name:'Mistral',url:'https://api.mistral.ai/v1/',path:'/mistral/v1/',key:'ro_mi_key',model:'ro_mi_model',def:'mistral-small-latest',max:'max_tokens',models:[{id:'mistral-small-latest',label:'mistral-small-latest (free, fast)'},{id:'mistral-medium-latest',label:'mistral-medium-latest (free, stronger)'},{id:'mistral-large-latest',label:'mistral-large-latest (free, strongest, slower)'}],wait:'Mistral free limits are 1 request a second.'},
@@ -606,6 +606,6 @@ function fail(e){if(e&&e.code==='declined')return;$('status').innerHTML='<span c
  gp.onchange=function(){R.set(R.PROV,gp.value);paint();gs.textContent='';load()};
  gm.onchange=function(){R.set(R.mn(),gm.value)};gr.onclick=load;load()})();
 </script>
-<div class="mute" style="text-align:center;font-size:11px;padding:10px 0">v0.11</div>
+<div class="mute" style="text-align:center;font-size:11px;padding:10px 0">v0.11.1</div>
 </body>
 </html>
