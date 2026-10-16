@@ -76,11 +76,13 @@ table{border-collapse:collapse;width:100%;font-size:13px}td,th{border-bottom:1px
   <details id="aiset" class="card inputs">
     <summary><span class="sumt">AI settings</span><span id="keyst" class="pill"></span><span class="edit"></span></summary>
     <div class="ig"><div class="in">
-      <div id="keybox"><b><label for="gk">Gemini API key (free)</label></b>
-      <input id="gk" type="password" autocomplete="off" spellcheck="false" placeholder="Paste your key from aistudio.google.com/apikey" style="width:100%;margin:6px 0 8px;border:1px solid var(--rule);border-radius:8px;padding:8px;font:13px ui-monospace,Consolas,monospace;background:var(--panel);color:var(--ink)"></div>
+      <label for="gp" class="mute" style="display:block">AI provider</label>
+      <select id="gp" style="margin:4px 0 8px;max-width:100%;border:1px solid var(--rule);border-radius:8px;padding:7px;background:var(--panel);color:var(--ink);font:inherit"><option value="cerebras">Cerebras (free and very fast)</option><option value="openrouter">OpenRouter (paid models)</option><option value="gemini">Google Gemini</option></select>
+      <div id="keybox"><b><label for="gk" id="gkl">OpenRouter API key</label></b>
+      <input id="gk" type="password" autocomplete="off" spellcheck="false" placeholder="Paste your key from openrouter.ai/keys" style="width:100%;margin:6px 0 8px;border:1px solid var(--rule);border-radius:8px;padding:8px;font:13px ui-monospace,Consolas,monospace;background:var(--panel);color:var(--ink)"></div>
       <label for="gm" class="mute" style="display:block">Model</label>
-      <select id="gm" style="margin-top:4px;max-width:100%;border:1px solid var(--rule);border-radius:8px;padding:7px;background:var(--panel);color:var(--ink);font:inherit"><option value="gemini-3.8-flash">gemini-3.8-flash</option></select> <button id="gr" type="button" style="padding:6px 10px;font-size:13px">Refresh models</button><span id="gs" class="mute"></span>
-      <p class="mute" style="margin:8px 0 0">The key stays in this browser only. Your files are read in your browser and only their text is sent to Google's Gemini API.</p></div></div>
+      <select id="gm" style="margin-top:4px;max-width:100%;border:1px solid var(--rule);border-radius:8px;padding:7px;background:var(--panel);color:var(--ink);font:inherit"></select> <button id="gr" type="button" style="padding:6px 10px;font-size:13px">Refresh models</button><span id="gs" class="mute"></span>
+      <p class="mute" style="margin:8px 0 0" id="gnote">The key stays in this browser only. Your files are read in your browser and only their text is sent to the AI provider. Free models may use prompts to improve their service, so use a paid model if that matters.</p></div></div>
   </details>
   <details id="inp" class="card inputs" open>
     <summary><span class="sumt">Inputs</span><span id="chips" class="row" style="gap:6px"></span><span class="edit"></span></summary>
@@ -103,44 +105,110 @@ table{border-collapse:collapse;width:100%;font-size:13px}td,th{border-bottom:1px
 </section>
 </main>
 <script>
-/* Standalone shim: replaces the claude.ai-only helpers with the free Gemini API and a normal browser download. */
+/* Standalone shim: replaces the claude.ai-only helpers with a free-tier AI API (OpenRouter or Gemini) and a normal browser download. */
 (function(){
- var KEY='ro_gemini_key',MODEL='ro_gemini_model';
- /* Set this to your Cloudflare Worker URL (no trailing slash). The Gemini key lives in the Worker, never in this page. */
+ var GKEY='ro_gemini_key',GMODEL='ro_gemini_model',PROV='ro_provider',OKEY='ro_or_key',OMODEL='ro_or_model',CKEY='ro_cb_key',CMODEL='ro_cb_model';
+ /* Set this to your Cloudflare Worker URL (no trailing slash) to keep the AI keys on a server instead of in each visitor's browser. */
  var PROXY='https://YOUR-WORKER.YOUR-SUBDOMAIN.workers.dev';
+ var DEFAULT_OR='anthropic/claude-haiku-5.5',FALLBACK_OR=['thinkingmachines/inkling:free','nvidia/nemotron-3-super-120b-a12b:free','openrouter/free'];
  var get=function(k){try{return localStorage.getItem(k)||''}catch(e){return''}},set=function(k,v){try{localStorage.setItem(k,v)}catch(e){}};
  var sleep=function(ms){return new Promise(function(r){setTimeout(r,ms)})};
- function parse(t){t=String(t||'').replace(/^\s*```(?:json)?/i,'').replace(/```\s*$/,'').trim();try{return JSON.parse(t)}catch(e){var a=t.indexOf('{'),b=t.lastIndexOf('}');if(a>=0&&b>a)return JSON.parse(t.slice(a,b+1));throw Error('The AI reply was not valid JSON. Please try again.')}}
  var useProxy=!!window.__proxyOverride||!/YOUR-WORKER/.test(PROXY);
- var BASE=useProxy?(window.__proxyOverride||PROXY)+'/v1beta/':'https://generativelanguage.googleapis.com/v1beta/';
- var kh=function(h){var k=get(KEY);if(!useProxy&&k)h['x-goog-api-key']=k;return h};
- async function discover(){var res;try{if(!useProxy&&!get(KEY))throw Error('Add your Gemini API key first.');res=await fetch(BASE+'models?pageSize=200',{headers:kh({})})}catch(e){if(/Add your/.test(e.message))throw e;throw Error('Could not reach the server.')}if(!res.ok)throw Error('Could not list models ('+res.status+')'+(useProxy?'.':'. Check your API key.'))
+ var prov=function(){var p=get(PROV);return p==='gemini'||p==='cerebras'||p==='openrouter'?p:'cerebras'};
+ function parse(t){t=String(t||'').replace(/^\s*```(?:json)?/i,'').replace(/```\s*$/,'').trim();try{return JSON.parse(t)}catch(e){var a=t.indexOf('{'),b=t.lastIndexOf('}');if(a>=0&&b>a)return JSON.parse(t.slice(a,b+1));throw Error('The AI reply was not valid JSON. Please try again.')}}
+ /* ---------- Gemini ---------- */
+ var GBASE=function(){return useProxy?(window.__proxyOverride||PROXY)+'/v1beta/':'https://generativelanguage.googleapis.com/v1beta/'};
+ var gh=function(h){var k=get(GKEY);if(!useProxy&&k)h['x-goog-api-key']=k;return h};
+ async function gdiscover(){var res;try{if(!useProxy&&!get(GKEY))throw Error('Add your Gemini API key first.');res=await fetch(GBASE()+'models?pageSize=200',{headers:gh({})})}catch(e){if(/Add your/.test(e.message))throw e;throw Error('Could not reach the server.')}if(!res.ok)throw Error('Could not list models ('+res.status+')'+(useProxy?'.':'. Check your API key.'));
   var d=await res.json(),ver=function(n){var m=/gemini-(\d+(?:\.\d+)?)/.exec(n);return m?parseFloat(m[1]):0};
   return(d.models||[]).filter(function(m){var n=m.name||'';return(m.supportedGenerationMethods||[]).indexOf('generateContent')>=0&&/flash/.test(n)&&!/image|tts|live|audio|embed|robotics|computer|native/.test(n)})
-   .map(function(m){return{id:m.name.replace(/^models\//,''),label:m.displayName||m.name}})
+   .map(function(m){return{id:m.name.replace(/^models\//,''),label:m.name.replace(/^models\//,'')}})
    .sort(function(a,b){return ver(b.id)-ver(a.id)||(/lite/.test(a.id)?1:0)-(/lite/.test(b.id)?1:0)||(/preview/.test(a.id)?1:0)-(/preview/.test(b.id)?1:0)})}
- async function json(prompt,opts){
-  if(!useProxy&&!get(KEY))throw Error('Add your free Gemini API key under "AI settings" first.');
-  var model=get(MODEL)||'gemini-3.8-flash',url;
+ async function gjson(prompt,opts){
+  if(!useProxy&&!get(GKEY))throw Error('Add your free Gemini API key under "AI settings" first.');
+  var model=get(GMODEL)||'gemini-3.8-flash',url;
   var body=JSON.stringify({contents:[{role:'user',parts:[{text:prompt}]}],generationConfig:{responseMimeType:'application/json',temperature:0.2}});
-  var last='';
-  var healed=false;
+  var last='',healed=false;
   for(var a=0;a<4;a++){
-   url=BASE+'models/'+model+':generateContent';var res;try{res=await fetch(url,{method:'POST',headers:kh({'Content-Type':'application/json'}),body:body})}catch(e){throw Error('Could not reach the Gemini API. Check your internet connection.')}
+   url=GBASE()+'models/'+model+':generateContent';var res;try{res=await fetch(url,{method:'POST',headers:gh({'Content-Type':'application/json'}),body:body})}catch(e){throw Error('Could not reach the Gemini API. Check your internet connection.')}
    if(res.ok){var d=await res.json(),c=(d.candidates||[])[0],parts=(c&&c.content&&c.content.parts)||[],text=parts.map(function(p){return p.text||''}).join('');
     if(!text)throw Error('The AI returned an empty reply'+(c&&c.finishReason?' ('+c.finishReason+')':'')+'. Please try again.');
     if(opts&&opts.onText)opts.onText({text:text});return parse(text)}
    var msg='';try{msg=((await res.json()).error||{}).message||''}catch(e){}last=res.status+(msg?': '+msg:'');
-   if(res.status===404&&!healed){healed=true;try{var L=await discover();if(L.length&&L[0].id!==model){model=L[0].id;set(MODEL,model);if(window.__ro.refresh)window.__ro.refresh();a--;continue}}catch(e){}}
-   if(res.status===404)throw Error('This Gemini model is not available ('+last+'). Pick another model under AI model.');
+   if(res.status===404&&!healed){healed=true;try{var L=await gdiscover();if(L.length&&L[0].id!==model){model=L[0].id;set(GMODEL,model);if(window.__ro.refresh)window.__ro.refresh();a--;continue}}catch(e){}}
+   if(res.status===404)throw Error('This Gemini model is not available ('+last+'). Pick another model under AI settings.');
    if(res.status===400||res.status===401||res.status===403)throw Error('Gemini rejected the request ('+last+').'+(useProxy?' The site owner needs to check the server setup.':' Check that your API key is correct.'));
    if(res.status===429||res.status>=500){await sleep(4000*(a+1));continue}
    throw Error('Gemini error '+last)}
-  if(/^429/.test(last))throw Error('Free-tier limit reached. Wait a minute and try again, or switch the model to Flash-Lite under AI model.');
+  if(/^429/.test(last))throw Error('Free-tier limit reached. Wait a minute and try again, or switch the model or provider under AI settings.');
   throw Error('Gemini is busy right now ('+last+'). Please try again.')}
+ /* ---------- OpenRouter ---------- */
+ var OBASE=function(){return useProxy?(window.__proxyOverride||PROXY)+'/openrouter/api/v1/':'https://openrouter.ai/api/v1/'};
+ var oh=function(h){var k=get(OKEY);if(!useProxy){if(k)h['Authorization']='Bearer '+k;h['X-Title']='Resume Optimiser'}return h};
+ var isFree=function(m){return /:free$/.test(m.id)||(m.pricing&&+m.pricing.prompt===0&&+m.pricing.completion===0)};
+ var PREF=[/inkling(?!-small)/,/nemotron-3-ultra/,/nemotron-3-super/,/minimax/,/inkling-small/,/dots/,/nemotron-3\.5/],BAD=/code|rerank|audio|tts|image|embed|lfm|mercury|vision|omni|laguna|guard|moderation|whisper/i,PAID=['anthropic/claude-haiku-5.5','anthropic/claude-sonnet-5.5','anthropic/claude-haiku-4.5','google/gemini-3.8-flash','openai/gpt-5-mini'];
+ async function odiscover(){if(!useProxy&&!get(OKEY)){}var res;try{res=await fetch(OBASE()+'models',{headers:oh({})})}catch(e){throw Error('Could not reach OpenRouter.')}if(!res.ok)throw Error('Could not list models ('+res.status+')'+(useProxy?'.':'. Check your API key.'));
+  var d=(await res.json()).data||[],txt=function(m){var o=(m.architecture||{}).output_modalities;return!o||o.indexOf('text')>=0},ok=d.filter(function(m){return txt(m)&&(m.context_length||0)>=32000});
+  var rank=function(id){for(var i=0;i<PREF.length;i++)if(PREF[i].test(id))return i;return 99};
+  var free=ok.filter(function(m){return isFree(m)&&!BAD.test(m.id)}).sort(function(a,b){return rank(a.id)-rank(b.id)||(b.context_length||0)-(a.context_length||0)}).map(function(m){return{id:m.id,label:m.id.replace(/:free$/,'')+' (free, '+Math.round((m.context_length||0)/1000)+'K)',group:'Free models'}});
+  var paid=PAID.filter(function(id){return ok.some(function(m){return m.id===id})}).map(function(id){return{id:id,label:id+' (paid, about a few cents per resume)',group:'Paid (recommended: fast, complete answers)'}});
+  var list=paid.concat(free);window.__orList=list;return list}
+ function otext(c){var t=c&&c.message&&c.message.content;if(Array.isArray(t))t=t.map(function(p){return p.text||''}).join('');return String(t||'')}
+ async function ojson(prompt,opts){
+  if(!useProxy&&!get(OKEY))throw Error('Add your OpenRouter API key under "AI settings" first.');
+  var chosen=get(OMODEL)||DEFAULT_OR,queue=[chosen];
+  if(/:free$|^openrouter\/free$/.test(chosen)){var pool=(window.__orList||[]).filter(function(m){return m.group==='Free models'}).map(function(m){return m.id});FALLBACK_OR.forEach(function(x){if(pool.indexOf(x)<0&&!(window.__orList||[]).length)pool.push(x)});pool.forEach(function(x){if(queue.indexOf(x)<0&&queue.length<4)queue.push(x)})}
+  var why=[];
+  for(var qi=0;qi<queue.length;qi++){var model=queue[qi],useRF=true;
+   for(var a=0;a<2;a++){
+    var body={model:model,messages:[{role:'user',content:prompt}],temperature:0.2,max_tokens:16000};if(useRF)body.response_format={type:'json_object'};
+    var res;try{res=await fetch(OBASE()+'chat/completions',{method:'POST',headers:oh({'Content-Type':'application/json'}),body:JSON.stringify(body)})}catch(e){why.push(model+': network');break}
+    var d=null;try{d=await res.json()}catch(e){}
+    var emsg=d&&d.error?(d.error.message||JSON.stringify(d.error)):'';
+    if(res.status===401||res.status===403)throw Error('OpenRouter rejected the key ('+res.status+'). '+(useProxy?'The site owner needs to check the server setup.':'Check that your API key is correct.'));
+    if(res.status===402)throw Error('OpenRouter says this key has no credits for this model. Add a few dollars of credit at openrouter.ai/credits, or pick a free model (slower, with daily limits).');
+    if(res.status===400&&useRF){useRF=false;a--;continue}
+    if(res.ok&&!emsg){var c=(d.choices||[])[0],text=otext(c);
+     if(c&&c.finish_reason==='length'){why.push(model+': reply cut off');break}
+     if(!text.trim()){why.push(model+': empty reply');break}
+     var out;try{out=parse(text)}catch(e){why.push(model+': not valid JSON');break}
+     window.__ro.lastModel=model;if(opts&&opts.onText)opts.onText({text:text});return out}
+    why.push(model+': '+(res.status||'')+(emsg?' '+emsg.slice(0,80):''));
+    if(res.status===429||res.status>=500||res.status===408){if(a===0){await sleep(3000);continue}}
+    break}}
+  throw Error('OpenRouter could not return a complete answer ('+why.slice(0,3).join('; ')+'). Try again, pick another model, or use a paid model for the most reliable results.')}
+ /* ---------- Cerebras (free, very fast) ---------- */
+ var CBASE=function(){return useProxy?(window.__proxyOverride||PROXY)+'/cerebras/v1/':'https://api.cerebras.ai/v1/'};
+ var ch=function(h){var k=get(CKEY);if(!useProxy&&k)h['Authorization']='Bearer '+k;return h};
+ var CB_MODELS=[{id:'gpt-oss-120b',label:'gpt-oss-120b (free, very fast)'},{id:'qwen-3.8-27b',label:'qwen-3.8-27b (free, very fast)'}];
+ async function cdiscover(){if(!useProxy&&!get(CKEY))return CB_MODELS;try{var res=await fetch(CBASE()+'models',{headers:ch({})});if(!res.ok)return CB_MODELS;var d=(await res.json()).data||[],ids=d.map(function(m){return m.id});var l=CB_MODELS.filter(function(m){return ids.indexOf(m.id)>=0});return l.length?l:CB_MODELS}catch(e){return CB_MODELS}}
+ async function cjson(prompt,opts){
+  if(!useProxy&&!get(CKEY))throw Error('Add your Cerebras API key under "AI settings" first.');
+  var queue=[get(CMODEL)||'gpt-oss-120b'];CB_MODELS.forEach(function(m){if(queue.indexOf(m.id)<0)queue.push(m.id)});var why=[];
+  for(var qi=0;qi<queue.length;qi++){var model=queue[qi],useRF=true;
+   for(var a=0;a<5;a++){
+    var body={model:model,messages:[{role:'user',content:prompt}],temperature:0.2,max_completion_tokens:16000};if(useRF)body.response_format={type:'json_object'};
+    var res;try{res=await fetch(CBASE()+'chat/completions',{method:'POST',headers:ch({'Content-Type':'application/json'}),body:JSON.stringify(body)})}catch(e){throw Error('Could not reach Cerebras from the browser ('+(e.message||'network error')+'). If this keeps happening, the site owner can route it through the server (see README).')}
+    var d=null;try{d=await res.json()}catch(e){}
+    var emsg=d&&d.message?d.message:(d&&d.error?(d.error.message||JSON.stringify(d.error)):'');
+    if(res.status===401||res.status===403)throw Error('Cerebras rejected the key ('+res.status+'). '+(useProxy?'The site owner needs to check the server setup.':'Check that your API key is correct.'));
+    if(res.status===400&&useRF){useRF=false;continue}
+    if(res.status===404){why.push(model+': not available');break}
+    if(res.status===429){if(opts&&opts.onText){}await sleep(8000+4000*a);continue}
+    if(res.status>=500){await sleep(3000);continue}
+    if(res.ok&&!emsg){var c=(d.choices||[])[0],text=otext(c);
+     if(c&&c.finish_reason==='length'){why.push(model+': reply cut off');break}
+     if(!text.trim()){why.push(model+': empty reply');break}
+     var out;try{out=parse(text)}catch(e){why.push(model+': not valid JSON');break}
+     window.__ro.lastModel=model;if(opts&&opts.onText)opts.onText({text:text});return out}
+    why.push(model+': '+(res.status||'')+(emsg?' '+emsg.slice(0,80):''));break}}
+  throw Error('Cerebras could not return a complete answer ('+why.slice(0,3).join('; ')+'). Free limits are 5 requests a minute and 1M tokens a day, so wait a minute and try again.')}
+ /* ---------- dispatch ---------- */
+ async function json(prompt,opts){var p=prov();return p==='gemini'?gjson(prompt,opts):p==='cerebras'?cjson(prompt,opts):ojson(prompt,opts)}
+ async function discover(){var p=prov();return p==='gemini'?gdiscover():p==='cerebras'?cdiscover():odiscover()}
  var dl={save:async function(o){var u=URL.createObjectURL(o.data),a=document.createElement('a');a.href=u;a.download=o.filename;document.body.appendChild(a);a.click();a.remove();setTimeout(function(){URL.revokeObjectURL(u)},4000)}};
  window.claude={use:async function(n){if(n==='sample')return{json:json};if(n==='downloads')return dl;throw Error('Unknown helper '+n)}};
- window.__ro={get:get,set:set,KEY:KEY,MODEL:MODEL,discover:discover,useProxy:useProxy};
+ window.__ro={get:get,set:set,PROV:PROV,prov:prov,kn:function(){var p=prov();return p==='gemini'?GKEY:p==='cerebras'?CKEY:OKEY},mn:function(){var p=prov();return p==='gemini'?GMODEL:p==='cerebras'?CMODEL:OMODEL},defModel:function(){var p=prov();return p==='gemini'?'gemini-3.8-flash':p==='cerebras'?'gpt-oss-120b':DEFAULT_OR},discover:discover,useProxy:useProxy};
 })();
 </script>
 <script>
@@ -519,17 +587,21 @@ function fileBase(){var m=(S.rw&&S.rw.meta)||{},parts=[clean(m.name||guessName()
 async function save(n,b){if(!S.dl){$('status').innerHTML='<span class="err">Downloads need this page opened in claude.ai.</span>';return}await S.dl.save({filename:n,data:b})}
 function fail(e){if(e&&e.code==='declined')return;$('status').innerHTML='<span class="err">'+esc(e.message||e.code||'Download failed')+'</span>'}
 
-(function(){var R=window.__ro,gk=document.getElementById('gk'),gm=document.getElementById('gm'),gr=document.getElementById('gr'),gs=document.getElementById('gs'),st=document.getElementById('keyst'),box=document.getElementById('aiset'),kb=document.getElementById('keybox');
- function show(){if(R.useProxy){st.textContent='Ready';st.className='pill ok';kb.hidden=true;return}var has=!!R.get(R.KEY);st.textContent=has?'Key saved':'Key needed';st.className='pill '+(has?'ok':'wn');if(!has)box.open=true}
- function fill(list){var cur=R.get(R.MODEL);if(/2\.5|1\.5|2\.0/.test(cur)){cur='';R.set(R.MODEL,'')}if(!list.length)return;
-  gm.innerHTML=list.map(function(m){return'<option value="'+m.id+'">'+m.id+'</option>'}).join('');
-  if(!cur||!list.some(function(m){return m.id===cur})){cur=list[0].id;R.set(R.MODEL,cur)}gm.value=cur}
- async function load(){if(!R.useProxy&&!R.get(R.KEY)){gs.textContent='';return}gs.textContent=' Loading models…';try{fill(await R.discover());gs.textContent=' Models loaded.'}catch(e){gs.textContent=' '+e.message}}
- R.refresh=function(){var c=R.get(R.MODEL);if(c&&!Array.prototype.some.call(gm.options,function(o){return o.value===c})){var o=document.createElement('option');o.value=c;o.textContent=c;gm.appendChild(o)}gm.value=c};
- gk.value=R.get(R.KEY);var m0=R.get(R.MODEL);if(/2\.5|1\.5|2\.0/.test(m0))R.set(R.MODEL,'');gm.value=R.get(R.MODEL)||'gemini-3.8-flash';show();
- var t;gk.oninput=function(){R.set(R.KEY,gk.value.trim());show();clearTimeout(t);t=setTimeout(load,700)};
- gm.onchange=function(){R.set(R.MODEL,gm.value)};gr.onclick=load;load()})();
+(function(){var R=window.__ro,gp=document.getElementById('gp'),gk=document.getElementById('gk'),gkl=document.getElementById('gkl'),gm=document.getElementById('gm'),gr=document.getElementById('gr'),gs=document.getElementById('gs'),st=document.getElementById('keyst'),box=document.getElementById('aiset'),kb=document.getElementById('keybox');
+ var T={cerebras:['Cerebras API key (free)','Paste your key from cloud.cerebras.ai'],openrouter:['OpenRouter API key','Paste your key from openrouter.ai/keys'],gemini:['Gemini API key (free)','Paste your key from aistudio.google.com/apikey']};
+ function show(){if(R.useProxy){st.textContent='Ready';st.className='pill ok';kb.hidden=true;return}var has=!!R.get(R.kn());st.textContent=has?'Key saved':'Key needed';st.className='pill '+(has?'ok':'wn');if(!has)box.open=true}
+ function opts(list){var g={},out='';list.forEach(function(m){var k=m.group||'';(g[k]=g[k]||[]).push(m)});Object.keys(g).forEach(function(k){var h=g[k].map(function(m){return'<option value="'+m.id+'">'+m.label+'</option>'}).join('');out+=k?'<optgroup label="'+k+'">'+h+'</optgroup>':h});return out}
+ function fill(list){var cur=R.get(R.mn());if(R.prov()==='gemini'&&/2\.5|1\.5|2\.0/.test(cur)){cur='';R.set(R.mn(),'')}if(!list.length)return;
+  gm.innerHTML=opts(list);if(!cur||!list.some(function(m){return m.id===cur})){cur=list.some(function(m){return m.id===R.defModel()})?R.defModel():list[0].id;R.set(R.mn(),cur)}gm.value=cur}
+ function baseline(){var d=R.get(R.mn())||R.defModel();gm.innerHTML='<option value="'+d+'">'+d+'</option>';gm.value=d}
+ async function load(){if(!R.useProxy&&!R.get(R.kn())){gs.textContent='';return}gs.textContent=' Loading models…';try{fill(await R.discover());gs.textContent=' Models loaded.'}catch(e){gs.textContent=' '+e.message}}
+ R.refresh=function(){var c=R.get(R.mn());if(c&&!Array.prototype.some.call(gm.options,function(o){return o.value===c})){var o=document.createElement('option');o.value=c;o.textContent=c;gm.appendChild(o)}gm.value=c};
+ function paint(){gp.value=R.prov();gkl.textContent=T[R.prov()][0];gk.placeholder=T[R.prov()][1];gk.value=R.get(R.kn());baseline();show()}
+ paint();
+ var t;gk.oninput=function(){R.set(R.kn(),gk.value.trim());show();clearTimeout(t);t=setTimeout(load,700)};
+ gp.onchange=function(){R.set(R.PROV,gp.value);paint();gs.textContent='';load()};
+ gm.onchange=function(){R.set(R.mn(),gm.value)};gr.onclick=load;load()})();
 </script>
-<div class="mute" style="text-align:center;font-size:11px;padding:10px 0">v0.8.1</div>
+<div class="mute" style="text-align:center;font-size:11px;padding:10px 0">v0.10</div>
 </body>
 </html>
